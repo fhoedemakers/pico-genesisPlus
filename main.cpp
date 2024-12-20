@@ -21,8 +21,6 @@
 #include "settings.h"
 #include "FrensFonts.h"
 
-#include "shared.h"
-#include "mytypes.h"
 
 
 bool isFatalError = false;
@@ -51,58 +49,56 @@ namespace
 }
 
 int sampleIndex = 0;
-void in_ram(processaudio)(int offset)
+void __not_in_flash_func(processaudio)(int offset)
 {
     int samples = 4; // 735/192 = 3.828125 192*4=768 735/3=245
 
-    if (offset == (IS_GG ? 24 : 0))
-    {
-        sampleIndex = 0;
-    }
-    else
-    {
-        sampleIndex += samples;
-        if (sampleIndex >= 735)
-        {
-            return;
-        }
-    }
-    short *p1 = snd.buffer[0] + sampleIndex;
-    short *p2 = snd.buffer[1] + sampleIndex;
-    while (samples)
-    {
-        auto &ring = dvi_->getAudioRingBuffer();
-        auto n = std::min<int>(samples, ring.getWritableSize());
-        if (!n)
-        {
-            return;
-        }
-        auto p = ring.getWritePointer();
-        int ct = n;
-        while (ct--)
-        {
-            int l = (*p1++ << 16) + *p2++;
-            // works also : int l = (*p1++ + *p2++) / 2;
-            int r = l;
-            // int l = *wave1++;
-            *p++ = {static_cast<short>(l), static_cast<short>(r)};
-        }
-        ring.advanceWritePointer(n);
-        samples -= n;
-    }
+    // if (offset == (IS_GG ? 24 : 0))
+    // {
+    //     sampleIndex = 0;
+    // }
+    // else
+    // {
+    //     sampleIndex += samples;
+    //     if (sampleIndex >= 735)
+    //     {
+    //         return;
+    //     }
+    // }
+    // short *p1 = snd.buffer[0] + sampleIndex;
+    // short *p2 = snd.buffer[1] + sampleIndex;
+    // while (samples)
+    // {
+    //     auto &ring = dvi_->getAudioRingBuffer();
+    //     auto n = std::min<int>(samples, ring.getWritableSize());
+    //     if (!n)
+    //     {
+    //         return;
+    //     }
+    //     auto p = ring.getWritePointer();
+    //     int ct = n;
+    //     while (ct--)
+    //     {
+    //         int l = (*p1++ << 16) + *p2++;
+    //         // works also : int l = (*p1++ + *p2++) / 2;
+    //         int r = l;
+    //         // int l = *wave1++;
+    //         *p++ = {static_cast<short>(l), static_cast<short>(r)};
+    //     }
+    //     ring.advanceWritePointer(n);
+    //     samples -= n;
+    // }
 }
 
 
 
-extern "C" void in_ram(sms_render_line)(int line, const uint8_t *buffer)
+extern "C" void __not_in_flash_func(render_line)(int line, const uint8_t *buffer)
 {
     // DVI top margin has #MARGINTOP lines
     // DVI bottom margin has #MARGINBOTTOM lines
     // DVI usable screen estate: MARGINTOP .. (240 - #MARGINBOTTOM)
-    // SMS has 192 lines
-    // GG  has 144 lines
-    // gg : Line starts at line 24
-    // sms: Line starts at line 0
+    // Genesis 320×224, 256×224, 320x240 (some PAL games), 256x240 (some PAL games),
+    //         320×448, 256×448, 320x480 (some PAL games), 256x480 (some PAL games)
     // Emulator loops from scanline 0 to 261
     // Audio needs to be processed per scanline
 
@@ -117,11 +113,11 @@ extern "C" void in_ram(sms_render_line)(int line, const uint8_t *buffer)
     uint16_t *sbuffer;
     if (buffer)
     {
-        uint16_t *sbuffer = b->data() + 32 + (IS_GG ? 48 : 0);
-        for (int i = screenCropX; i < BMP_WIDTH - screenCropX; i++)
-        {
-            sbuffer[i - screenCropX] = palette444[(buffer[i + BMP_X_OFFSET]) & 31];
-        }
+        // uint16_t *sbuffer = b->data() + 32 + (IS_GG ? 48 : 0);
+        // for (int i = screenCropX; i < BMP_WIDTH - screenCropX; i++)
+        // {
+        //     sbuffer[i - screenCropX] = palette444[(buffer[i + BMP_X_OFFSET]) & 31];
+        // }
     }
     else
     {
@@ -183,43 +179,35 @@ int ProcessAfterFrameIsRendered()
 
 static DWORD prevButtons[2]{};
 static DWORD prevButtonssystem[2]{};
-static DWORD prevOtherButtons[2]{};
-
-#define OTHER_BUTTON1 (0b1)
-#define OTHER_BUTTON2 (0b10)
-
-#define NESPAD_SELECT (0x04)
-#define NESPAD_START (0x08)
-#define NESPAD_UP (0x10)
-#define NESPAD_DOWN (0x20)
-#define NESPAD_LEFT (0x40)
-#define NESPAD_RIGHT (0x80)
-#define NESPAD_A (0x01)
-#define NESPAD_B (0x02)
 
 static int rapidFireMask[2]{};
 static int rapidFireCounter = 0;
-void processinput(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem, bool ignorepushed, char *gamepadType)
+void processinput(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem, bool ignorepushed)
 {
     // pwdPad1 and pwdPad2 are only used in menu and are only set on first push
     *pdwPad1 = *pdwPad2 = *pdwSystem = 0;
 
-    int smssystem[2]{};
-    unsigned long pushed, pushedsystem, pushedother;
+    unsigned long pushed, pushedsystem;
     bool usbConnected = false;
     for (int i = 0; i < 2; i++)
     {
-        int nespadbuttons = 0;
+        
         auto &dst = (i == 0) ? *pdwPad1 : *pdwPad2;
         auto &gp = io::getCurrentGamePadState(i);
         if ( i == 0 )
         {
             usbConnected = gp.isConnected();
-            if (gamepadType) {
-                strcpy(gamepadType, gp.GamePadName);
-            }
         }
-      
+        int v = 0;
+        // int v = (gp.buttons & io::GamePadState::Button::LEFT ? LEFT : 0) |
+        //         (gp.buttons & io::GamePadState::Button::RIGHT ? RIGHT : 0) |
+        //         (gp.buttons & io::GamePadState::Button::UP ? UP : 0) |
+        //         (gp.buttons & io::GamePadState::Button::DOWN ? DOWN : 0) |
+        //         (gp.buttons & io::GamePadState::Button::A ? A : 0) |
+        //         (gp.buttons & io::GamePadState::Button::B ? B : 0) |
+        //         (gp.buttons & io::GamePadState::Button::SELECT ? SELECT : 0) |
+        //         (gp.buttons & io::GamePadState::Button::START ? START : 0) |
+        //         0;
 
 #if NES_PIN_CLK != -1
         // When USB controller is connected both NES ports act as controller 2
@@ -227,12 +215,12 @@ void processinput(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem, bool ignorep
         {          
             if (i == 1)
             {
-                 nespadbuttons= nespadbuttons | nespad_states[1] | nespad_states[0];
+                 v = v | nespad_states[1] | nespad_states[0];
             }
         }
         else
         {
-            nespadbuttons |= nespad_states[i];
+            v |= nespad_states[i];
         }
 #endif
 // When USB controller is connected  wiipad acts as controller 2 
@@ -241,87 +229,73 @@ void processinput(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem, bool ignorep
         {
             if (i == 1)
             {
-                nespadbuttons |= wiipad_read();
+                v |= wiipad_read();
             }
         }
         else // if no USB controller is connected, wiipad acts as controller 1
         {
             if (i == 0)
             {
-                nespadbuttons |= wiipad_read();
+                v |= wiipad_read();
             }
         }
 #endif
        
 
-        // if (gp.buttons & io::GamePadState::Button::SELECT) printf("SELECT\n");
-        // if (gp.buttons & io::GamePadState::Button::START) printf("START\n");
-        input.pad[i] = smsbuttons;
-        auto p1 = smssystem[i];
-        if (ignorepushed == false)
+        int rv = v;
+        if (rapidFireCounter & 2)
         {
-            pushed = smsbuttons & ~prevButtons[i];
-            pushedsystem = smssystem[i] & ~prevButtonssystem[i];
-            pushedother = otherButtons & ~prevOtherButtons[i];
+            // 15 fire/sec
+            rv &= ~rapidFireMask[i];
         }
-        else
-        {
-            pushed = smsbuttons;
-            pushedsystem = smssystem[i];
-            pushedother = otherButtons;
-        }
-        if (p1 & INPUT_PAUSE)
-        {
-            if (pushedsystem & INPUT_START)
-            {
-                reset = true;
-                printf("Reset pressed\n");
-            }
-        }
-        if (p1 & INPUT_START)
-        {
-            // Toggle frame rate display
-            if (pushed & INPUT_BUTTON1)
-            {
-                fps_enabled = !fps_enabled;
-                printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
-            }
-            if (pushed & INPUT_UP)
-            {
-                Frens::screenMode(-1);
-            }
-            else if (pushed & INPUT_DOWN)
-            {
-                Frens::screenMode(+1);
-            }
-        }
-        prevButtons[i] = smsbuttons;
+
+        dst = rv;
+
+        auto p1 = v;
+
+        auto pushed = v & ~prevButtons[i];
+        // if (p1 & INPUT_PAUSE)
+        // {
+        //     if (pushedsystem & INPUT_START)
+        //     {
+        //         reset = true;
+        //         printf("Reset pressed\n");
+        //     }
+        // }
+        // if (p1 & INPUT_START)
+        // {
+        //     // Toggle frame rate display
+        //     if (pushed & INPUT_BUTTON1)
+        //     {
+        //         fps_enabled = !fps_enabled;
+        //         printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
+        //     }
+        //     if (pushed & INPUT_UP)
+        //     {
+        //         Frens::screenMode(-1);
+        //     }
+        //     else if (pushed & INPUT_DOWN)
+        //     {
+        //         Frens::screenMode(+1);
+        //     }
+        // }
+        prevButtons[i] = v;
       
         // return only on first push
         if (pushed)
         {
-            dst = smsbuttons;
+            dst = v;
         }
-        if (pushedother)
-        {
-            if (pushedother & OTHER_BUTTON1)
-            {
-                printf("Other 1\n");
-            }
-            if (pushedother & OTHER_BUTTON2)
-            {
-                printf("Other 2\n");
-            }
-        }
+      
     }
 }
 
-void in_ram(process)(void)
+void __not_in_flash_func(process)(void)
 {
     DWORD pdwPad1, pdwPad2, pdwSystem; // have only meaning in menu
     while (reset == false)
     {
-        processinput(&pdwPad1, &pdwPad2, &pdwSystem, false, nullptr);
+        processinput(&pdwPad1, &pdwPad2, &pdwSystem, false);
         // renderframe
         // TODO
         ProcessAfterFrameIsRendered();
@@ -378,23 +352,13 @@ int main()
         }
         fileSize = f_size(&file);
         f_close(&file);
-        isGameGear = Frens::cstr_endswith(selectedRom, ".gg");
+      
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
-        if (isGameGear)
-        {
-            printf("Game Gear rom detected\n");
-        } else {
-            printf("Master System rom detected\n");
-        }
-        load_rom(ROM_FILE_ADDR, fileSize, isGameGear);
-        // Initialize all systems and power on
-        system_init(SMS_AUD_RATE);
-        // load state if any
-        // system_load_state();
-        system_reset();
+        
+        // Todo: Initialize emulator
         printf("Starting game\n");
         process();
-        system_shutdown();
+        // system_shutdown();
         selectedRom[0] = 0;
         showSplash = false;
     }
