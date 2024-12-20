@@ -16,44 +16,39 @@ __contact__ = "https://github.com/bzhxx"
 __license__ = "GPLv3"
 
 */
+#pragma GCC optimize("Ofast")
 
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 
-#include "m68k.h"
-#include "gwenesis_io.h"
-#include "gwenesis_bus.h"
-#include "gwenesis_vdp.h"
-#include "z80inst.h"
-#include "ym2612.h"
-#include "gwenesis_sn76489.h"
+#include "../cpus/M68K/m68k.h"
+#include "../io/gwenesis_io.h"
+#include "../bus/gwenesis_bus.h"
+#include "../vdp/gwenesis_vdp.h"
+#include "../sound/z80inst.h"
 
-#include "gwenesis_savestate.h"
+#include "../savestate/gwenesis_savestate.h"
 
 #include <assert.h>
 
 void gwenesis_save_state() {
+  /* DO NOT CHANGE ORDER - NEEDS TO BE SAME AS IN LOAD */
   gwenesis_m68k_save_state();
   gwenesis_io_save_state();
   gwenesis_bus_save_state();
   gwenesis_vdp_gfx_save_state();
   gwenesis_vdp_mem_save_state();
-  gwenesis_z80inst_save_state();
-  gwenesis_ym2612_save_state();
-  gwenesis_sn76489_save_state();
 
 }
 
 void gwenesis_load_state() {
+  /* DO NOT CHANGE ORDER - NEEDS TO BE SAME AS IN SAVE */
   gwenesis_m68k_load_state();
   gwenesis_io_load_state();
   gwenesis_bus_load_state();
   gwenesis_vdp_gfx_load_state();
   gwenesis_vdp_mem_load_state();
-  gwenesis_z80inst_load_state();
-  gwenesis_ym2612_load_state();
-  gwenesis_sn76489_load_state();
 
 }

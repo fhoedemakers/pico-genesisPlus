@@ -153,12 +153,9 @@ if (PICO_SDK_VERSION_MAJOR LESS 2)
 else()
     family_configure_target(${projectname} "" )
 endif()
-# add_compile_definitions(CFG_TUSB_DEBUG=0)
-set(SMS_FLAGS -DMB_SMS -DLSB_FIRST=0
-        -DSMS_FILE_ADDR=0x10080000 -DNDEBUG
-)
+
 target_compile_definitions(${projectname} PUBLIC 
-    ${SMS_FLAGS}
+
     DVICONFIG=${DVICONFIG}
     SDCARD_PIN_SPI0_CS=${SD_CS}
     SDCARD_PIN_SPI0_SCK=${SD_SCK}
@@ -195,6 +192,7 @@ PRIVATE
     tinyusb_host 
     pico_shared  
     xinput_host 
+    gwenesis
 )
 if(PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     # Attention pico2_w in arm-s or risv-s mode causes the led blinking to generate red screen flicker and
@@ -206,7 +204,6 @@ endif()
 target_include_directories(${projectname}
 PRIVATE
     pico_lib
-#    gwenesis
     tusb_xinput
     pico_shared
     .
@@ -215,6 +212,7 @@ PRIVATE
 add_subdirectory(pico_lib/dvi)
 add_subdirectory(pico_lib/util)
 add_subdirectory(pico_shared)
+add_subdirectory(gwenesis)
 add_subdirectory(tusb_xinput xinput_host)
 pico_add_extra_outputs(${projectname})
 

@@ -21,6 +21,19 @@
 #include "settings.h"
 #include "FrensFonts.h"
 
+/* Gwenesis Emulator */
+extern "C" {
+#include "gwenesis/buffers.h"
+#include "gwenesis/cpus/M68K/m68k.h"
+#include "gwenesis/sound/z80inst.h"
+#include "gwenesis/bus/gwenesis_bus.h"
+#include "gwenesis/io/gwenesis_io.h"
+#include "gwenesis/vdp/gwenesis_vdp.h"
+#include "gwenesis/savestate/gwenesis_savestate.h"
+#include  "gwenesis/sound/gwenesis_sn76489.h"
+#include "gwenesis/sound/ym2612.h"
+}
+
 
 
 bool isFatalError = false;
@@ -357,7 +370,10 @@ int main()
         
         // Todo: Initialize emulator
         printf("Starting game\n");
+        init_emulator_mem();
+        load_cartridge(ROM_FILE_ADDR);
         process();
+        free_emulator_mem();
         // system_shutdown();
         selectedRom[0] = 0;
         showSplash = false;

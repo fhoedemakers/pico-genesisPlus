@@ -16,13 +16,15 @@ __contact__ = "https://github.com/bzhxx"
 __license__ = "GPLv3"
 
 */
+#pragma GCC optimize("Ofast")
+
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include "gwenesis_io.h"
-#include "gwenesis_savestate.h"
+#include "../savestate/gwenesis_savestate.h"
 
-unsigned char button_state[3]= {0xff,0xff,0xff};
+unsigned short button_state[3]= {0xff,0xff,0xff};
 
 /* Button mapping 
     7 6 5 4 3 2 1 0
@@ -30,7 +32,8 @@ Start A B C R L D U
 */
 static unsigned char gwenesis_io_pad_state[3] = {0x33,0x33,0x33};
 
-#define GWENESIS_IO_VERSION 0x81 /* oversea NTSC model version 81 */
+//#define GWENESIS_IO_VERSION 0x81 /* oversea NTSC model version 81 */
+#define GWENESIS_IO_VERSION 0xC1 /* oversea PAL model version C1 */
 /*
 $A10003	:	MODE 	VMOD 	DISK 	RSV 	VER3 	VER2 	VER1 	VER0
 MODE (R) 	0: Domestic Model

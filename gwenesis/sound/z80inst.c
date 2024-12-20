@@ -16,26 +16,28 @@ __contact__ = "https://github.com/bzhxx"
 __license__ = "GPLv3"
 
 */
+#pragma GCC optimize("Ofast")
+
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
-#include "Z80.h"
+#include "../cpus/Z80/Z80.h"
 #include "z80inst.h"
-#include "m68k.h"
-#include "gwenesis_bus.h"
-#include "ym2612.h"
+#include "../cpus/M68K/m68k.h"
+#include "../bus/gwenesis_bus.h"
+// #include "ym2612.h"
 #include "gwenesis_sn76489.h"
-#include "gwenesis_savestate.h"
-
-#if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
-  #pragma GCC optimize("Ofast")
-#endif
+#include "ym2612.h"
+#include "../savestate/gwenesis_savestate.h"
 
 static int bus_ack = 0;
 static int reset = 0;
 static int reset_once = 0;
 int zclk = 0;
 static int initialized = 0;
+
+extern int audio_enabled;
+extern bool sound_enabled;
 
 unsigned char *Z80_RAM;
 
@@ -270,7 +272,7 @@ byte RdZ80(register word Addr) {
     return Z80_RAM[Addr & 0x1FFF];
 
   if (Addr < 0x6000)
-    return YM2612Read(zclk + current_timeslice - (cpu.ICount * Z80_FREQ_DIVISOR));
+	   return (audio_enabled) ? YM2612Read(zclk + current_timeslice - (cpu.ICount * Z80_FREQ_DIVISOR)) : 0x00;
 
   z80_log(__FUNCTION__, "addr= %x", Addr);
 
@@ -295,7 +297,8 @@ void WrZ80(register word Addr, register byte Value) {
   // @4000-4003
   if (Addr < 0x6000) {
     z80_log("Z80","ZZYM(%x,%x) zk=%d,tgt=%d",Addr&0x3,Value, zclk, zclk + current_timeslice -(cpu.ICount * Z80_FREQ_DIVISOR) );
-    YM2612Write(Addr&0x3, Value, zclk + current_timeslice -(cpu.ICount * Z80_FREQ_DIVISOR) );
+    if (audio_enabled)
+	    YM2612Write(Addr&0x3, Value, zclk + current_timeslice -(cpu.ICount * Z80_FREQ_DIVISOR) );
     return;
   }
 
@@ -329,28 +332,11 @@ void PatchZ80(register Z80 *R) {;}
 void DebugZ80(register Z80 *R) {;}
 
 void gwenesis_z80inst_save_state() {
-    SaveState* state;
-    state = saveGwenesisStateOpenForWrite("z80inst");
-    saveGwenesisStateSetBuffer(state, "cpu", &cpu, sizeof(Z80));
-    saveGwenesisStateSet(state, "bus_ack", bus_ack);
-    saveGwenesisStateSet(state, "reset", reset);
-    saveGwenesisStateSet(state, "reset_once", reset_once);
-    saveGwenesisStateSet(state, "zclk", zclk);
-    saveGwenesisStateSet(state, "initialized", initialized);
-    saveGwenesisStateSet(state, "Z80_BANK", Z80_BANK);
-    saveGwenesisStateSet(state, "current_timeslice",current_timeslice);
+
 }
 
 void gwenesis_z80inst_load_state() {
-    SaveState* state = saveGwenesisStateOpenForRead("z80inst");
-    saveGwenesisStateGetBuffer(state, "cpu", &cpu, sizeof(Z80));
-    bus_ack = saveGwenesisStateGet(state, "bus_ack");
-    reset = saveGwenesisStateGet(state, "reset");
-    reset_once = saveGwenesisStateGet(state, "reset_once");
-    zclk = saveGwenesisStateGet(state, "zclk");
-    initialized = saveGwenesisStateGet(state, "initialized");
-    Z80_BANK = saveGwenesisStateGet(state, "Z80_BANK");
-    current_timeslice = saveGwenesisStateGet(state, "current_timeslice");
+
 
 }
 

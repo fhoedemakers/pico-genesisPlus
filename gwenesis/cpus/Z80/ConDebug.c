@@ -12,6 +12,8 @@
 /**     commercially. Please, notify me, if you make any    **/
 /**     changes to this file.                               **/
 /*************************************************************/
+#pragma GCC optimize("Ofast")
+
 #ifdef DEBUG
 
 #ifndef CONDEBUG

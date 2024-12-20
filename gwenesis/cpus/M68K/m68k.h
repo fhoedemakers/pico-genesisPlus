@@ -43,9 +43,12 @@
 
 #include <setjmp.h>
 #include "macros.h"
+#include "pico.h"
+#include "../../buffers.h"
 #ifdef HOOK_CPU
 #include "cpuhook.h"
 #endif
+//#include <avr/pgmspace.h>
 
 /* ======================================================================== */
 /* ==================== ARCHITECTURE-DEPENDANT DEFINES ==================== */
@@ -79,7 +82,7 @@
 
 /* signed and unsigned int must be at least 32 bits wide */
 #define sint   signed   int
-#define uint   unsigned int
+//#define uint   unsigned int
 
 
 #if M68K_USE_64_BIT
@@ -149,43 +152,26 @@
 #define ROM_SWAP
 #define RAM_SWAP
 
-// 16/32 bits acces to RAM/ROM
+// 8/16/32 bits access to RAM/ROM
 
-#if GNW_TARGET_MARIO != 0 | GNW_TARGET_ZELDA != 0
+extern const unsigned char *ROM_DATA;
+extern const unsigned char *ROM_METADATA;
+//extern unsigned char* M68K_RAM;
 
-	extern unsigned char *ROM_DATA;
-	extern unsigned char *M68K_RAM;
-#else
+// ROM needs to be converted for this to work!
+#define FETCH8ROM(A)    (unsigned char)  ROM_DATA[ A^1 ]
+#define FETCH16ROM(A)  ( (unsigned short)  (*((unsigned short *) &ROM_DATA[A])) )
+#define FETCH32ROM(A) ( (*(unsigned short *)(&ROM_DATA[(A+2)])) | ((*(unsigned short *)(&ROM_DATA[A])) << 16))
 
-	extern unsigned char ROM_DATA[];
-	extern unsigned char M68K_RAM[];
-#endif
+#define FETCH8RAM(A)         (unsigned char)  M68K_RAM[ (A ^ 1) & 0xFFFF]
+#define FETCH16RAM(A)   ( (unsigned short)  (*((unsigned short *) &M68K_RAM[A&0XFFFF])) )
+#define FETCH32RAM(A) ( (*(unsigned short *)(&M68K_RAM[(A+2)&0XFFFF])) | ((*(unsigned short *)(&M68K_RAM[A&0XFFFF])) << 16))
 
-#define FETCH8ROM(A) ((ROM_DATA[((A) ^ 1)]))
-#define FETCH16ROM(A) ((*(unsigned short *)&ROM_DATA[(A)]))
-#define FETCH32ROM(A) ( (*(unsigned int *)&ROM_DATA[(A)] << 16) | (*(unsigned int *)&ROM_DATA[(A)] >> 16) )
-
-#if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
-
-/* Direct access to ITCRAM as M68KRAM on STM32H7 mapped at 0x0 !!  */
-#define FETCH8RAM(A)    (*(unsigned char  *)(((A)&0XFFFF) ^ 1))
-#define FETCH16RAM(A)   (*(unsigned short *)((A)&0XFFFF))
-#define FETCH32RAM(A) (((*(unsigned int *)((A)&0XFFFF)) << 16) | ((*(unsigned int *)((A)&0XFFFF)) >> 16))
-
-#define WRITE8RAM(A, V)  ((*(unsigned char  *)(((A)&0XFFFF) ^ 1)) = (V))
-#define WRITE16RAM(A, V) ((*(unsigned short *)( (A)&0XFFFF))      = (V))
-#define WRITE32RAM(A, V) ((*(unsigned int   *)( (A)&0XFFFF))      = (((V) << 16) | ((V) >> 16)))
-#else
-
-#define FETCH8RAM(A) ((M68K_RAM[(A ^ 1) & 0xFFFF]))
-#define FETCH16RAM(A) ((*(unsigned short *)&M68K_RAM[(A)&0XFFFF]))
-#define FETCH32RAM(A) ( (*(unsigned int *)&M68K_RAM[(A&0XFFFF)] << 16) | (*(unsigned int *)&M68K_RAM[(A&0XFFFF)] >> 16) )
-
-#define WRITE8RAM(A, V) (M68K_RAM[(A ^ 1) & 0xFFFF] = (V))
-#define WRITE16RAM(A, V) ((*(unsigned short *)&M68K_RAM[(A)&0XFFFF] = (V)))
-#define WRITE32RAM(A, V) ((*(unsigned int *)&M68K_RAM[(A)&0XFFFF] =( ((V) << 16) | ((V) >> 16) ) ))
-
-#endif
+#define WRITE8RAM(A, V)   M68K_RAM[ (A ^ 1) & 0xFFFF ] =  V
+#define WRITE16RAM(A, V)  ( *((unsigned short *) &M68K_RAM[ A & 0XFFFF ]) = V )
+// RAM needs to be cyclically accessible (i.e. addresses wrap around)
+#define WRITE32RAM(A, V)  ( *((unsigned short *) &M68K_RAM[  A      & 0XFFFF ]) = V >> 16); \
+                          ( *((unsigned short *) &M68K_RAM[ (A + 2) & 0XFFFF ]) = V & 0xffff); \
 
 #define m68k_read_immediate_16(A) ( ( (A) & 0x800000) ? FETCH16RAM((A)) : FETCH16ROM((A)) )
 #define m68k_read_immediate_32(A) ( ( (A) & 0x800000) ? FETCH32RAM((A)) : FETCH32ROM((A)) )

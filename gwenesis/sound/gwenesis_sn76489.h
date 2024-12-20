@@ -27,7 +27,7 @@ typedef unsigned int UINT32;
 typedef signed char INT8;
 typedef signed short int INT16;
 typedef signed int INT32;
-typedef long signed int INT64;
+typedef long signed int INT641;
 
 typedef struct
 {
@@ -48,7 +48,7 @@ typedef struct
     INT16 ToneFreqVals[4];      /* Frequency register values (counters) */
     INT8 ToneFreqPos[4];        /* Frequency channel flip-flops */
     INT16 Channels[4];          /* Value of each channel, before stereo is applied */
-    INT64 IntermediatePos[4];   /* intermediate values used at boundaries between + and - */
+    INT641 IntermediatePos[4];   /* intermediate values used at boundaries between + and - */
 
 } SN76489_Context;
 
