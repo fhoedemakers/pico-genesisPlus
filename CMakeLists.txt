@@ -214,6 +214,7 @@ add_subdirectory(pico_lib/util)
 add_subdirectory(pico_shared)
 add_subdirectory(gwenesis)
 add_subdirectory(tusb_xinput xinput_host)
+target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)
 pico_add_extra_outputs(${projectname})
 
 

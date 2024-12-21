@@ -16,7 +16,7 @@
 #ifndef _H_YM2612_
 #define _H_YM2612_
 
-extern int16_t gwenesis_sn76489_buffer[];
+extern int16_t *gwenesis_sn76489_buffer;
 ///extern int ym2612_index;
 ///extern int ym2612_clock;
 

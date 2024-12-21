@@ -52,7 +52,7 @@ typedef struct
 
 } SN76489_Context;
 
-extern int16 gwenesis_sn76489_buffer[];
+extern int16 *gwenesis_sn76489_buffer;
 extern int sn76489_index;
 extern int sn76489_clock;
 

@@ -35,7 +35,6 @@ extern "C" {
 }
 
 
-
 bool isFatalError = false;
 static FATFS fs;
 char *romName;
@@ -55,6 +54,7 @@ static char fpsString[3] = "00";
 
 bool reset = false;
 
+bool reboot = false;
 
 namespace
 {
@@ -302,7 +302,8 @@ void processinput(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem, bool ignorep
       
     }
 }
-
+void gwenesis_io_get_buttons() {
+}
 void __not_in_flash_func(process)(void)
 {
     DWORD pdwPad1, pdwPad2, pdwSystem; // have only meaning in menu
@@ -315,6 +316,144 @@ void __not_in_flash_func(process)(void)
     }
 }
 
+/* Clocks and synchronization */
+/* system clock is video clock */
+int system_clock;
+unsigned int lines_per_frame = LINES_PER_FRAME_NTSC; //262; /* NTSC: 262, PAL: 313 */
+int scan_line;
+unsigned int frame_counter = 0;
+unsigned int drawFrame = 1;
+int z80_enable_mode = 2;
+bool interlace = true;
+int frame = 0;
+int frame_cnt = 0;
+int frame_timer_start = 0;
+bool limit_fps = true;
+bool frameskip = true;
+int audio_enabled = 0;
+bool sn76489_enabled = true;
+uint8_t snd_accurate = 0;
+extern unsigned char gwenesis_vdp_regs[0x20];
+extern unsigned int gwenesis_vdp_status;
+extern unsigned int screen_width, screen_height;
+extern int hint_pending;
+
+int sn76489_index;                                                      /* sn78649 audio buffer index */
+int sn76489_clock;  
+void __time_critical_func(emulate)() {
+
+   
+    gwenesis_vdp_set_buffer((uint8_t *) SCREEN);
+    while (!reboot) {
+        /* Eumulator loop */
+        int hint_counter = gwenesis_vdp_regs[10];
+
+        const bool is_pal = REG1_PAL;
+        screen_width = REG12_MODE_H40 ? 320 : 256;
+        screen_height = is_pal ? 240 : 224;
+        lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
+        // Printf values
+        printf("frame %d, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n",frame, is_pal, screen_width, screen_height, lines_per_frame);
+        // graphics_set_buffer(buffer, screen_width, screen_height);
+        // TODO: move to separate function graphics_set_dimensions ?
+        // FH graphics_set_buffer((uint8_t*)SCREEN, screen_width, screen_height);
+        // FH graphics_set_offset(screen_width != 320 ? 32 : 0, screen_height != 240 ? 8 : 0);
+        gwenesis_vdp_render_config();
+
+        zclk = 0;
+        /* Reset the difference clocks and audio index */
+        system_clock = 0;
+        sn76489_clock = 0;
+        sn76489_index = 0;
+        scan_line = 0;
+         if (z80_enable_mode == 1)
+            z80_run(lines_per_frame * VDP_CYCLES_PER_LINE);
+
+        while (scan_line < lines_per_frame) {
+            /* CPUs */
+            m68k_run(system_clock + VDP_CYCLES_PER_LINE);
+            if (z80_enable_mode == 2)
+                    z80_run(system_clock + VDP_CYCLES_PER_LINE);
+            /* Video */
+            // Interlace mode
+            if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0) {
+                gwenesis_vdp_render_line(scan_line); /* render scan_line */
+            }
+
+            // On these lines, the line counter interrupt is reloaded
+            if (scan_line == 0 || scan_line > screen_height) {
+                hint_counter = REG10_LINE_COUNTER;
+            }
+
+            // interrupt line counter
+            if (--hint_counter < 0) {
+                if (REG0_LINE_INTERRUPT != 0 && scan_line <= screen_height) {
+                    hint_pending = 1;
+                    if ((gwenesis_vdp_status & STATUS_VIRQPENDING) == 0)
+                        m68k_update_irq(4);
+                }
+                hint_counter = REG10_LINE_COUNTER;
+            }
+
+            scan_line++;
+
+            // vblank begin at the end of last rendered line
+            if (scan_line == screen_height) {
+                if (REG1_VBLANK_INTERRUPT != 0) {
+                    gwenesis_vdp_status |= STATUS_VIRQPENDING;
+                    m68k_set_irq(6);
+                }
+                z80_irq_line(1);
+            }
+
+            if (!is_pal && scan_line == screen_height + 1) {
+                z80_irq_line(0);
+                // FRAMESKIP every 3rd frame
+                drawFrame = frameskip && frame % 3 != 0;
+                // if (frameskip && frame % 3 == 0) {
+                //     drawFrame = 0;
+                // } else {
+                //     drawFrame = 1;
+                // }
+            }
+
+            system_clock += VDP_CYCLES_PER_LINE;
+        }
+
+        frame++;
+        if (limit_fps) {
+            frame_cnt++;
+            if (frame_cnt == (is_pal ? 5 : 6)) {
+                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6)) {
+                    busy_wait_at_least_cycles(10);
+                }; // 60 Hz
+                frame_timer_start = time_us_64();
+                frame_cnt = 0;
+            }
+        }
+
+        if (audio_enabled) {
+            gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
+        }
+        // ym2612_run(262 * VDP_CYCLES_PER_LINE);
+        /*
+        gwenesis_SN76489_run(262 * VDP_CYCLES_PER_LINE);
+        ym2612_run(262 * VDP_CYCLES_PER_LINE);
+        static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
+        for (int h = 0; h < ym2612_index * 2 * GWENESIS_AUDIO_SAMPLING_DIVISOR; h++) {
+            snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) << 3;
+        }
+        i2s_dma_write(&i2s_config, snd_buf);*/
+        // reset m68k cycles to the begin of next frame cycle
+        m68k.cycles -= system_clock;
+
+        /* copy audio samples for DMA */
+        //gwenesis_sound_submit();
+
+    }
+   
+    reboot = false;
+}
 /// @brief
 /// Start emulator. Emulator does not run well in DEBUG mode, lots of red screen flicker. In order to keep it running fast enough, we need to run it in release mode or in
 /// RelWithDebugInfo mode.
@@ -350,9 +489,10 @@ int main()
             dvi_->getBlankSettings().top = 4 * 2;
             dvi_->getBlankSettings().bottom = 4 * 2;
             scaleMode8_7_ = Frens::applyScreenMode(ScreenMode::NOSCANLINE_8_7);
-            menu("Pico-SMS+", ErrorMessage, isFatalError, showSplash, ".sms .gg"); // never returns, but reboots upon selecting a game
+            menu("Pico-SMS+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
         }
         reset = false;
+    #if 0
         FRESULT fr;
         FIL file;
         fr = f_open(&file, selectedRom, FA_READ);
@@ -367,12 +507,14 @@ int main()
         f_close(&file);
       
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
-        
+    #endif    
         // Todo: Initialize emulator
         printf("Starting game\n");
         init_emulator_mem();
         load_cartridge(ROM_FILE_ADDR);
-        process();
+        power_on();
+        reset_emulation();
+        emulate();
         free_emulator_mem();
         // system_shutdown();
         selectedRom[0] = 0;

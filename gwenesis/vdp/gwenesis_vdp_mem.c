@@ -880,14 +880,17 @@ void gwenesis_vdp_write_memory_16(unsigned int address, unsigned int value) {
     address = address & 0x1F;
 
     if (address < 0x4) {
+        //printf("vdp_write 1\n");
         gwenesis_vdp_write_data_port_16(value);
         return;
     }
     if (address < 0x8) {
+        // printf("vdp_write 2\n");
         gwenesis_vdp_control_port_write(value);
         return;
     }
     if (address < 0x18) {
+        // printf("vdp_write 3\n");
         // PSG 8 bits write
         vdpm_log(__FUNCTION__, "PSG sclk=%d,mclk=%d", system_clock, m68k_cycles_master());
         if(audio_enabled && sn76489_enabled)
@@ -895,7 +898,7 @@ void gwenesis_vdp_write_memory_16(unsigned int address, unsigned int value) {
         return;
     }
     // UNHANDLED
-    printf("unhandled gwenesis_vdp_write(%x, %x)\n", address, value);
+    // printf("unhandled gwenesis_vdp_write(%x, %x)\n", address, value);
 }
 
 void gwenesis_vdp_mem_save_state() {
