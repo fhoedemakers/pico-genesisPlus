@@ -58,7 +58,7 @@ bool reboot = false;
 
 namespace
 {
-    constexpr uint32_t CPUFreqKHz = 252000;
+    constexpr uint32_t CPUFreqKHz = 266000; // 252000;
 }
 
 int sampleIndex = 0;
@@ -492,7 +492,7 @@ int main()
             menu("Pico-SMS+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
         }
         reset = false;
-    #if 0
+    #if 1
         FRESULT fr;
         FIL file;
         fr = f_open(&file, selectedRom, FA_READ);
