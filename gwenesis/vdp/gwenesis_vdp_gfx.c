@@ -27,25 +27,25 @@ __license__ = "GPLv3"
 #include "../bus/gwenesis_bus.h"
 #include "../savestate/gwenesis_savestate.h"
 
-//#include <assert.h>
+// #include <assert.h>
 
 #pragma GCC optimize("Ofast")
 
 // extern unsigned char __aligned(4) VRAM[];
 
-extern unsigned short CRAM[]; // CRAM - Palettes
-extern unsigned char SAT_CACHE[]__attribute__((aligned(4))); // Sprite cache
-extern unsigned char gwenesis_vdp_regs[]; // Registers
+extern unsigned short CRAM[];                                 // CRAM - Palettes
+extern unsigned char SAT_CACHE[] __attribute__((aligned(4))); // Sprite cache
+extern unsigned char gwenesis_vdp_regs[];                     // Registers
 
 extern unsigned short VSRAM[]; // VSRAM - Scrolling
 
 // Define screen buffers: original and scaled for host RGB
-//unsigned char *screen, *scaled_screen;
+// unsigned char *screen, *scaled_screen;
 
 // Define SCREEN buffers for embedded 565 format
-static uint8_t* screen_buffer_line = 0;
+static uint8_t *screen_buffer_line = 0;
 
-//static unsigned short *screen_buffer=0;
+// static unsigned short *screen_buffer=0;
 
 // Overflow is the maximum size we can draw outside to avoid
 // wasting time and code in clipping. The maximum object is a 4x4 sprite,
@@ -77,24 +77,25 @@ static int Window_firstcol;
 static int Window_lastcol;
 
 // 16 bits access to VRAM
-#define FETCH16VRAM(A)  ( (VRAM[(A)+1]) | (VRAM[(A)] << 8) )
+#define FETCH16VRAM(A) ((VRAM[(A) + 1]) | (VRAM[(A)] << 8))
 
 #define VDP_GFX_DISABLE_LOGGING 1
 
 #if !VDP_GFX_DISABLE_LOGGING
 #include <stdarg.h>
-void vdpg_log(const char *subs, const char *fmt, ...) {
-  extern int frame_counter;
-  extern int scan_line;
+void vdpg_log(const char *subs, const char *fmt, ...)
+{
+    extern int frame_counter;
+    extern int scan_line;
 
-  va_list va;
+    va_list va;
 
-  printf("%06d:%03d :[%s] vc:%03x hc:%03x", frame_counter, scan_line, subs,gwenesis_vdp_vcounter(),gwenesis_vdp_hcounter());
+    printf("%06d:%03d :[%s] vc:%03x hc:%03x", frame_counter, scan_line, subs, gwenesis_vdp_vcounter(), gwenesis_vdp_hcounter());
 
-  va_start(va, fmt);
-  vfprintf(stdout, fmt, va);
-  va_end(va);
-  printf("\n");
+    va_start(va, fmt);
+    vfprintf(stdout, fmt, va);
+    va_end(va);
+    printf("\n");
 }
 #else
 #define vdpg_log(...)
@@ -105,7 +106,7 @@ void vdpg_log(const char *subs, const char *fmt, ...) {
  *  Set original and scaled screen buffer for host
  *
  ******************************************************************************/
-//host
+// host
 /*
 void gwenesis_vdp_set_buffers(unsigned char *screen_buffer, unsigned char *scaled_buffer)
 {
@@ -113,15 +114,17 @@ void gwenesis_vdp_set_buffers(unsigned char *screen_buffer, unsigned char *scale
     scaled_screen = scaled_buffer;
 }
 */
-//embedded
-void gwenesis_vdp_set_buffer(uint8_t* ptr_screen_buffer) {
+// embedded
+void gwenesis_vdp_set_buffer(uint8_t *ptr_screen_buffer)
+{
     screen_buffer_line = ptr_screen_buffer;
-    //screen_buffer = ptr_screen_buffer;
+    // screen_buffer = ptr_screen_buffer;
 }
 
-void gwenesis_vdp_get_buffer(uint16_t** ptr_screen_buffer) {
+void gwenesis_vdp_get_buffer(uint16_t **ptr_screen_buffer)
+{
     *ptr_screen_buffer = (uint16_t *)&render_buffer[PIX_OVERFLOW];
-    //screen_buffer = ptr_screen_buffer;
+    // screen_buffer = ptr_screen_buffer;
 }
 
 /******************************************************************************
@@ -136,102 +139,162 @@ void gwenesis_vdp_get_buffer(uint16_t** ptr_screen_buffer) {
  *
  ******************************************************************************/
 
-#define PIX0(P) ( ((P) & 0x000000F0 ) >>   4 )
-#define PIX1(P) ( ((P) & 0x0000000F ) >>   0 )
-#define PIX2(P) ( ((P) & 0x0000F000 ) >>  12 )
-#define PIX3(P) ( ((P) & 0x00000F00 ) >>   8 )
-#define PIX4(P) ( ((P) & 0x00F00000 ) >>  20 )
-#define PIX5(P) ( ((P) & 0x000F0000 ) >>  16 )
-#define PIX6(P) ( ((P) & 0xF0000000 ) >>  28 )
-#define PIX7(P) ( ((P) & 0x0F000000 ) >>  24 )
+#define PIX0(P) (((P) & 0x000000F0) >> 4)
+#define PIX1(P) (((P) & 0x0000000F) >> 0)
+#define PIX2(P) (((P) & 0x0000F000) >> 12)
+#define PIX3(P) (((P) & 0x00000F00) >> 8)
+#define PIX4(P) (((P) & 0x00F00000) >> 20)
+#define PIX5(P) (((P) & 0x000F0000) >> 16)
+#define PIX6(P) (((P) & 0xF0000000) >> 28)
+#define PIX7(P) (((P) & 0x0F000000) >> 24)
 
-static inline __attribute__((always_inline))
-void draw_pattern_nofliph_sprite(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
-
-    /*  not transparent pixel to write AND not already a sprite*/
-    if (PIX0(p) && (scr[0] & PIXATTR_SPRITE) == 0) scr[0] = attrs | PIX0(p);
-    if (PIX1(p) && (scr[1] & PIXATTR_SPRITE) == 0) scr[1] = attrs | PIX1(p);
-    if (PIX2(p) && (scr[2] & PIXATTR_SPRITE) == 0) scr[2] = attrs | PIX2(p);
-    if (PIX3(p) && (scr[3] & PIXATTR_SPRITE) == 0) scr[3] = attrs | PIX3(p);
-    if (PIX4(p) && (scr[4] & PIXATTR_SPRITE) == 0) scr[4] = attrs | PIX4(p);
-    if (PIX5(p) && (scr[5] & PIXATTR_SPRITE) == 0) scr[5] = attrs | PIX5(p);
-    if (PIX6(p) && (scr[6] & PIXATTR_SPRITE) == 0) scr[6] = attrs | PIX6(p);
-    if (PIX7(p) && (scr[7] & PIXATTR_SPRITE) == 0) scr[7] = attrs | PIX7(p);
-}
-
-static inline __attribute__((always_inline))
-void draw_pattern_fliph_sprite(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
+// static inline __attribute__((always_inline)) void draw_pattern_nofliph_sprite(uint8_t *scr, uint32_t p, uint8_t attrs)
+static void __not_in_flash_func(draw_pattern_nofliph_sprite)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
 
     /*  not transparent pixel to write AND not already a sprite*/
-    if (PIX7(p) && (scr[0] & PIXATTR_SPRITE) == 0) scr[0] = attrs | PIX7(p);
-    if (PIX6(p) && (scr[1] & PIXATTR_SPRITE) == 0) scr[1] = attrs | PIX6(p);
-    if (PIX5(p) && (scr[2] & PIXATTR_SPRITE) == 0) scr[2] = attrs | PIX5(p);
-    if (PIX4(p) && (scr[3] & PIXATTR_SPRITE) == 0) scr[3] = attrs | PIX4(p);
-    if (PIX3(p) && (scr[4] & PIXATTR_SPRITE) == 0) scr[4] = attrs | PIX3(p);
-    if (PIX2(p) && (scr[5] & PIXATTR_SPRITE) == 0) scr[5] = attrs | PIX2(p);
-    if (PIX1(p) && (scr[6] & PIXATTR_SPRITE) == 0) scr[6] = attrs | PIX1(p);
-    if (PIX0(p) && (scr[7] & PIXATTR_SPRITE) == 0) scr[7] = attrs | PIX0(p);
+    if (PIX0(p) && (scr[0] & PIXATTR_SPRITE) == 0)
+        scr[0] = attrs | PIX0(p);
+    if (PIX1(p) && (scr[1] & PIXATTR_SPRITE) == 0)
+        scr[1] = attrs | PIX1(p);
+    if (PIX2(p) && (scr[2] & PIXATTR_SPRITE) == 0)
+        scr[2] = attrs | PIX2(p);
+    if (PIX3(p) && (scr[3] & PIXATTR_SPRITE) == 0)
+        scr[3] = attrs | PIX3(p);
+    if (PIX4(p) && (scr[4] & PIXATTR_SPRITE) == 0)
+        scr[4] = attrs | PIX4(p);
+    if (PIX5(p) && (scr[5] & PIXATTR_SPRITE) == 0)
+        scr[5] = attrs | PIX5(p);
+    if (PIX6(p) && (scr[6] & PIXATTR_SPRITE) == 0)
+        scr[6] = attrs | PIX6(p);
+    if (PIX7(p) && (scr[7] & PIXATTR_SPRITE) == 0)
+        scr[7] = attrs | PIX7(p);
 }
 
-static inline __attribute__((always_inline))
-void draw_pattern_nofliph_sprite_over_planes(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
+//static inline __attribute__((always_inline)) void draw_pattern_fliph_sprite(uint8_t *scr, uint32_t p, uint8_t attrs)
+static  void __not_in_flash_func(draw_pattern_fliph_sprite)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
+
+    /*  not transparent pixel to write AND not already a sprite*/
+    if (PIX7(p) && (scr[0] & PIXATTR_SPRITE) == 0)
+        scr[0] = attrs | PIX7(p);
+    if (PIX6(p) && (scr[1] & PIXATTR_SPRITE) == 0)
+        scr[1] = attrs | PIX6(p);
+    if (PIX5(p) && (scr[2] & PIXATTR_SPRITE) == 0)
+        scr[2] = attrs | PIX5(p);
+    if (PIX4(p) && (scr[3] & PIXATTR_SPRITE) == 0)
+        scr[3] = attrs | PIX4(p);
+    if (PIX3(p) && (scr[4] & PIXATTR_SPRITE) == 0)
+        scr[4] = attrs | PIX3(p);
+    if (PIX2(p) && (scr[5] & PIXATTR_SPRITE) == 0)
+        scr[5] = attrs | PIX2(p);
+    if (PIX1(p) && (scr[6] & PIXATTR_SPRITE) == 0)
+        scr[6] = attrs | PIX1(p);
+    if (PIX0(p) && (scr[7] & PIXATTR_SPRITE) == 0)
+        scr[7] = attrs | PIX0(p);
+}
+
+//static inline __attribute__((always_inline)) void draw_pattern_nofliph_sprite_over_planes(uint8_t *scr, uint32_t p, uint8_t attrs)
+static  void __not_in_flash_func(draw_pattern_nofliph_sprite_over_planes)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
 
     /* High priority */
-    if (attrs & PIXATTR_HIPRI) {
+    if (attrs & PIXATTR_HIPRI)
+    {
         /*  not transparent pixel to write AND not already a sprite*/
-        if (PIX0(p) && (scr[0] & PIXATTR_SPRITE) == 0) scr[0] = attrs | PIX0(p);
-        if (PIX1(p) && (scr[1] & PIXATTR_SPRITE) == 0) scr[1] = attrs | PIX1(p);
-        if (PIX2(p) && (scr[2] & PIXATTR_SPRITE) == 0) scr[2] = attrs | PIX2(p);
-        if (PIX3(p) && (scr[3] & PIXATTR_SPRITE) == 0) scr[3] = attrs | PIX3(p);
-        if (PIX4(p) && (scr[4] & PIXATTR_SPRITE) == 0) scr[4] = attrs | PIX4(p);
-        if (PIX5(p) && (scr[5] & PIXATTR_SPRITE) == 0) scr[5] = attrs | PIX5(p);
-        if (PIX6(p) && (scr[6] & PIXATTR_SPRITE) == 0) scr[6] = attrs | PIX6(p);
-        if (PIX7(p) && (scr[7] & PIXATTR_SPRITE) == 0) scr[7] = attrs | PIX7(p);
+        if (PIX0(p) && (scr[0] & PIXATTR_SPRITE) == 0)
+            scr[0] = attrs | PIX0(p);
+        if (PIX1(p) && (scr[1] & PIXATTR_SPRITE) == 0)
+            scr[1] = attrs | PIX1(p);
+        if (PIX2(p) && (scr[2] & PIXATTR_SPRITE) == 0)
+            scr[2] = attrs | PIX2(p);
+        if (PIX3(p) && (scr[3] & PIXATTR_SPRITE) == 0)
+            scr[3] = attrs | PIX3(p);
+        if (PIX4(p) && (scr[4] & PIXATTR_SPRITE) == 0)
+            scr[4] = attrs | PIX4(p);
+        if (PIX5(p) && (scr[5] & PIXATTR_SPRITE) == 0)
+            scr[5] = attrs | PIX5(p);
+        if (PIX6(p) && (scr[6] & PIXATTR_SPRITE) == 0)
+            scr[6] = attrs | PIX6(p);
+        if (PIX7(p) && (scr[7] & PIXATTR_SPRITE) == 0)
+            scr[7] = attrs | PIX7(p);
     }
     /* Low priority */
-    else {
+    else
+    {
         /*  not transparent pixel to write AND not already a sprite or higher priority*/
-        if (PIX0(p) && (scr[0] & PIXATTR_SPRITE_HIPRI) == 0) scr[0] = attrs | PIX0(p);
-        if (PIX1(p) && (scr[1] & PIXATTR_SPRITE_HIPRI) == 0) scr[1] = attrs | PIX1(p);
-        if (PIX2(p) && (scr[2] & PIXATTR_SPRITE_HIPRI) == 0) scr[2] = attrs | PIX2(p);
-        if (PIX3(p) && (scr[3] & PIXATTR_SPRITE_HIPRI) == 0) scr[3] = attrs | PIX3(p);
-        if (PIX4(p) && (scr[4] & PIXATTR_SPRITE_HIPRI) == 0) scr[4] = attrs | PIX4(p);
-        if (PIX5(p) && (scr[5] & PIXATTR_SPRITE_HIPRI) == 0) scr[5] = attrs | PIX5(p);
-        if (PIX6(p) && (scr[6] & PIXATTR_SPRITE_HIPRI) == 0) scr[6] = attrs | PIX6(p);
-        if (PIX7(p) && (scr[7] & PIXATTR_SPRITE_HIPRI) == 0) scr[7] = attrs | PIX7(p);
+        if (PIX0(p) && (scr[0] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[0] = attrs | PIX0(p);
+        if (PIX1(p) && (scr[1] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[1] = attrs | PIX1(p);
+        if (PIX2(p) && (scr[2] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[2] = attrs | PIX2(p);
+        if (PIX3(p) && (scr[3] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[3] = attrs | PIX3(p);
+        if (PIX4(p) && (scr[4] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[4] = attrs | PIX4(p);
+        if (PIX5(p) && (scr[5] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[5] = attrs | PIX5(p);
+        if (PIX6(p) && (scr[6] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[6] = attrs | PIX6(p);
+        if (PIX7(p) && (scr[7] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[7] = attrs | PIX7(p);
     }
 }
 
-static inline __attribute__((always_inline))
-void draw_pattern_fliph_sprite_over_planes(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
+//static inline __attribute__((always_inline)) void draw_pattern_fliph_sprite_over_planes(uint8_t *scr, uint32_t p, uint8_t attrs)
+static void __not_in_flash_func(draw_pattern_fliph_sprite_over_planes)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
 
     /* High priority */
-    if (attrs & PIXATTR_HIPRI) {
+    if (attrs & PIXATTR_HIPRI)
+    {
         /*  not transparent pixel to write AND not already a sprite*/
-        if (PIX7(p) && (scr[0] & PIXATTR_SPRITE) == 0) scr[0] = attrs | PIX7(p);
-        if (PIX6(p) && (scr[1] & PIXATTR_SPRITE) == 0) scr[1] = attrs | PIX6(p);
-        if (PIX5(p) && (scr[2] & PIXATTR_SPRITE) == 0) scr[2] = attrs | PIX5(p);
-        if (PIX4(p) && (scr[3] & PIXATTR_SPRITE) == 0) scr[3] = attrs | PIX4(p);
-        if (PIX3(p) && (scr[4] & PIXATTR_SPRITE) == 0) scr[4] = attrs | PIX3(p);
-        if (PIX2(p) && (scr[5] & PIXATTR_SPRITE) == 0) scr[5] = attrs | PIX2(p);
-        if (PIX1(p) && (scr[6] & PIXATTR_SPRITE) == 0) scr[6] = attrs | PIX1(p);
-        if (PIX0(p) && (scr[7] & PIXATTR_SPRITE) == 0) scr[7] = attrs | PIX0(p);
+        if (PIX7(p) && (scr[0] & PIXATTR_SPRITE) == 0)
+            scr[0] = attrs | PIX7(p);
+        if (PIX6(p) && (scr[1] & PIXATTR_SPRITE) == 0)
+            scr[1] = attrs | PIX6(p);
+        if (PIX5(p) && (scr[2] & PIXATTR_SPRITE) == 0)
+            scr[2] = attrs | PIX5(p);
+        if (PIX4(p) && (scr[3] & PIXATTR_SPRITE) == 0)
+            scr[3] = attrs | PIX4(p);
+        if (PIX3(p) && (scr[4] & PIXATTR_SPRITE) == 0)
+            scr[4] = attrs | PIX3(p);
+        if (PIX2(p) && (scr[5] & PIXATTR_SPRITE) == 0)
+            scr[5] = attrs | PIX2(p);
+        if (PIX1(p) && (scr[6] & PIXATTR_SPRITE) == 0)
+            scr[6] = attrs | PIX1(p);
+        if (PIX0(p) && (scr[7] & PIXATTR_SPRITE) == 0)
+            scr[7] = attrs | PIX0(p);
     }
     /* Low priority */
-    else {
+    else
+    {
         /*  not transparent pixel to write AND not already a sprite or higher priority*/
-        if (PIX7(p) && (scr[0] & PIXATTR_SPRITE_HIPRI) == 0) scr[0] = attrs | PIX7(p);
-        if (PIX6(p) && (scr[1] & PIXATTR_SPRITE_HIPRI) == 0) scr[1] = attrs | PIX6(p);
-        if (PIX5(p) && (scr[2] & PIXATTR_SPRITE_HIPRI) == 0) scr[2] = attrs | PIX5(p);
-        if (PIX4(p) && (scr[3] & PIXATTR_SPRITE_HIPRI) == 0) scr[3] = attrs | PIX4(p);
-        if (PIX3(p) && (scr[4] & PIXATTR_SPRITE_HIPRI) == 0) scr[4] = attrs | PIX3(p);
-        if (PIX2(p) && (scr[5] & PIXATTR_SPRITE_HIPRI) == 0) scr[5] = attrs | PIX2(p);
-        if (PIX1(p) && (scr[6] & PIXATTR_SPRITE_HIPRI) == 0) scr[6] = attrs | PIX1(p);
-        if (PIX0(p) && (scr[7] & PIXATTR_SPRITE_HIPRI) == 0) scr[7] = attrs | PIX0(p);
+        if (PIX7(p) && (scr[0] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[0] = attrs | PIX7(p);
+        if (PIX6(p) && (scr[1] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[1] = attrs | PIX6(p);
+        if (PIX5(p) && (scr[2] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[2] = attrs | PIX5(p);
+        if (PIX4(p) && (scr[3] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[3] = attrs | PIX4(p);
+        if (PIX3(p) && (scr[4] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[4] = attrs | PIX3(p);
+        if (PIX2(p) && (scr[5] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[5] = attrs | PIX2(p);
+        if (PIX1(p) && (scr[6] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[6] = attrs | PIX1(p);
+        if (PIX0(p) && (scr[7] & PIXATTR_SPRITE_HIPRI) == 0)
+            scr[7] = attrs | PIX0(p);
     }
 }
 
@@ -243,12 +306,15 @@ void draw_pattern_fliph_sprite_over_planes(uint8_t* scr, uint32_t p, uint8_t att
  *
  ******************************************************************************/
 
-
-static inline __attribute__((always_inline)) void
-draw_pattern_nofliph_planeB(uint8_t* scr, uint32_t p, uint8_t attrs) {
+// static inline __attribute__((always_inline)) void
+// draw_pattern_nofliph_planeB(uint8_t *scr, uint32_t p, uint8_t attrs)
+static void
+__not_in_flash_func(draw_pattern_nofliph_planeB)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
     const uint8_t back = gwenesis_vdp_regs[7];
 
-    if (p == 0) {
+    if (p == 0)
+    {
         scr[0] = back;
         scr[1] = back;
         scr[2] = back;
@@ -271,10 +337,12 @@ draw_pattern_nofliph_planeB(uint8_t* scr, uint32_t p, uint8_t attrs) {
     scr[7] = PIX7(p) ? attrs | (PIX7(p)) : back;
 }
 
-static inline __attribute__((always_inline)) void
-draw_pattern_fliph_planeB(uint8_t* scr, uint32_t p, uint8_t attrs) {
+//static inline __attribute__((always_inline)) void
+static void  __not_in_flash_func(draw_pattern_fliph_planeB)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
     const uint8_t back = gwenesis_vdp_regs[7];
-    if (p == 0) {
+    if (p == 0)
+    {
         scr[0] = back;
         scr[1] = back;
         scr[2] = back;
@@ -297,55 +365,95 @@ draw_pattern_fliph_planeB(uint8_t* scr, uint32_t p, uint8_t attrs) {
     scr[7] = PIX0(p) ? attrs | (PIX0(p)) : back;
 }
 
-static inline __attribute__((always_inline)) void
-draw_pattern_nofliph_planeAoverB(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
+// static inline __attribute__((always_inline)) void
+static void __not_in_flash_func(draw_pattern_nofliph_planeAoverB)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
 
-    if (attrs & PIXATTR_HIPRI) {
-        if (PIX0(p)) scr[0] = attrs | (PIX0(p));
-        if (PIX1(p)) scr[1] = attrs | (PIX1(p));
-        if (PIX2(p)) scr[2] = attrs | (PIX2(p));
-        if (PIX3(p)) scr[3] = attrs | (PIX3(p));
-        if (PIX4(p)) scr[4] = attrs | (PIX4(p));
-        if (PIX5(p)) scr[5] = attrs | (PIX5(p));
-        if (PIX6(p)) scr[6] = attrs | (PIX6(p));
-        if (PIX7(p)) scr[7] = attrs | (PIX7(p));
+    if (attrs & PIXATTR_HIPRI)
+    {
+        if (PIX0(p))
+            scr[0] = attrs | (PIX0(p));
+        if (PIX1(p))
+            scr[1] = attrs | (PIX1(p));
+        if (PIX2(p))
+            scr[2] = attrs | (PIX2(p));
+        if (PIX3(p))
+            scr[3] = attrs | (PIX3(p));
+        if (PIX4(p))
+            scr[4] = attrs | (PIX4(p));
+        if (PIX5(p))
+            scr[5] = attrs | (PIX5(p));
+        if (PIX6(p))
+            scr[6] = attrs | (PIX6(p));
+        if (PIX7(p))
+            scr[7] = attrs | (PIX7(p));
     }
-    else {
-        if (PIX0(p) && (scr[0] & PIXATTR_HIPRI) == 0) scr[0] = attrs | PIX0(p);
-        if (PIX1(p) && (scr[1] & PIXATTR_HIPRI) == 0) scr[1] = attrs | PIX1(p);
-        if (PIX2(p) && (scr[2] & PIXATTR_HIPRI) == 0) scr[2] = attrs | PIX2(p);
-        if (PIX3(p) && (scr[3] & PIXATTR_HIPRI) == 0) scr[3] = attrs | PIX3(p);
-        if (PIX4(p) && (scr[4] & PIXATTR_HIPRI) == 0) scr[4] = attrs | PIX4(p);
-        if (PIX5(p) && (scr[5] & PIXATTR_HIPRI) == 0) scr[5] = attrs | PIX5(p);
-        if (PIX6(p) && (scr[6] & PIXATTR_HIPRI) == 0) scr[6] = attrs | PIX6(p);
-        if (PIX7(p) && (scr[7] & PIXATTR_HIPRI) == 0) scr[7] = attrs | PIX7(p);
+    else
+    {
+        if (PIX0(p) && (scr[0] & PIXATTR_HIPRI) == 0)
+            scr[0] = attrs | PIX0(p);
+        if (PIX1(p) && (scr[1] & PIXATTR_HIPRI) == 0)
+            scr[1] = attrs | PIX1(p);
+        if (PIX2(p) && (scr[2] & PIXATTR_HIPRI) == 0)
+            scr[2] = attrs | PIX2(p);
+        if (PIX3(p) && (scr[3] & PIXATTR_HIPRI) == 0)
+            scr[3] = attrs | PIX3(p);
+        if (PIX4(p) && (scr[4] & PIXATTR_HIPRI) == 0)
+            scr[4] = attrs | PIX4(p);
+        if (PIX5(p) && (scr[5] & PIXATTR_HIPRI) == 0)
+            scr[5] = attrs | PIX5(p);
+        if (PIX6(p) && (scr[6] & PIXATTR_HIPRI) == 0)
+            scr[6] = attrs | PIX6(p);
+        if (PIX7(p) && (scr[7] & PIXATTR_HIPRI) == 0)
+            scr[7] = attrs | PIX7(p);
     }
 }
 
-static inline __attribute__((always_inline)) void
-draw_pattern_fliph_planeAoverB(uint8_t* scr, uint32_t p, uint8_t attrs) {
-    if (p == 0) return;
+//static inline __attribute__((always_inline)) void
+static void __not_in_flash_func(draw_pattern_fliph_planeAoverB)(uint8_t *scr, uint32_t p, uint8_t attrs)
+{
+    if (p == 0)
+        return;
 
-    if (attrs & PIXATTR_HIPRI) {
-        if (PIX7(p)) scr[0] = attrs | PIX7(p);
-        if (PIX6(p)) scr[1] = attrs | PIX6(p);
-        if (PIX5(p)) scr[2] = attrs | PIX5(p);
-        if (PIX4(p)) scr[3] = attrs | PIX4(p);
-        if (PIX3(p)) scr[4] = attrs | PIX3(p);
-        if (PIX2(p)) scr[5] = attrs | PIX2(p);
-        if (PIX1(p)) scr[6] = attrs | PIX1(p);
-        if (PIX0(p)) scr[7] = attrs | PIX0(p);
+    if (attrs & PIXATTR_HIPRI)
+    {
+        if (PIX7(p))
+            scr[0] = attrs | PIX7(p);
+        if (PIX6(p))
+            scr[1] = attrs | PIX6(p);
+        if (PIX5(p))
+            scr[2] = attrs | PIX5(p);
+        if (PIX4(p))
+            scr[3] = attrs | PIX4(p);
+        if (PIX3(p))
+            scr[4] = attrs | PIX3(p);
+        if (PIX2(p))
+            scr[5] = attrs | PIX2(p);
+        if (PIX1(p))
+            scr[6] = attrs | PIX1(p);
+        if (PIX0(p))
+            scr[7] = attrs | PIX0(p);
     }
-    else {
-        if (PIX7(p) && (scr[0] & PIXATTR_HIPRI) == 0) scr[0] = attrs | PIX7(p);
-        if (PIX6(p) && (scr[1] & PIXATTR_HIPRI) == 0) scr[1] = attrs | PIX6(p);
-        if (PIX5(p) && (scr[2] & PIXATTR_HIPRI) == 0) scr[2] = attrs | PIX5(p);
-        if (PIX4(p) && (scr[3] & PIXATTR_HIPRI) == 0) scr[3] = attrs | PIX4(p);
-        if (PIX3(p) && (scr[4] & PIXATTR_HIPRI) == 0) scr[4] = attrs | PIX3(p);
-        if (PIX2(p) && (scr[5] & PIXATTR_HIPRI) == 0) scr[5] = attrs | PIX2(p);
-        if (PIX1(p) && (scr[6] & PIXATTR_HIPRI) == 0) scr[6] = attrs | PIX1(p);
-        if (PIX0(p) && (scr[7] & PIXATTR_HIPRI) == 0) scr[7] = attrs | PIX0(p);
+    else
+    {
+        if (PIX7(p) && (scr[0] & PIXATTR_HIPRI) == 0)
+            scr[0] = attrs | PIX7(p);
+        if (PIX6(p) && (scr[1] & PIXATTR_HIPRI) == 0)
+            scr[1] = attrs | PIX6(p);
+        if (PIX5(p) && (scr[2] & PIXATTR_HIPRI) == 0)
+            scr[2] = attrs | PIX5(p);
+        if (PIX4(p) && (scr[3] & PIXATTR_HIPRI) == 0)
+            scr[3] = attrs | PIX4(p);
+        if (PIX3(p) && (scr[4] & PIXATTR_HIPRI) == 0)
+            scr[4] = attrs | PIX3(p);
+        if (PIX2(p) && (scr[5] & PIXATTR_HIPRI) == 0)
+            scr[5] = attrs | PIX2(p);
+        if (PIX1(p) && (scr[6] & PIXATTR_HIPRI) == 0)
+            scr[6] = attrs | PIX1(p);
+        if (PIX0(p) && (scr[7] & PIXATTR_HIPRI) == 0)
+            scr[7] = attrs | PIX0(p);
     }
 }
 
@@ -356,8 +464,9 @@ draw_pattern_fliph_planeAoverB(uint8_t* scr, uint32_t p, uint8_t attrs) {
  *  used for sprites and planes drawing
  *
  ******************************************************************************/
-static inline __attribute__((always_inline))
-void draw_pattern_sprite(uint8_t* scr, uint16_t name, int paty) {
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_pattern_sprite)(uint8_t *scr, uint16_t name, int paty)
+{
     // uint16_t pat_addr = name << 5; //name * 32;
     // uint8_t pat_palette = BITS(name, 13, 2);
     // //unsigned int is_pat_pri = name & 0x8000;
@@ -388,8 +497,9 @@ void draw_pattern_sprite(uint8_t* scr, uint16_t name, int paty) {
         draw_pattern_nofliph_sprite(scr, pattern, attrs);
 }
 
-static inline __attribute__((always_inline))
-void draw_pattern_sprite_over_planes(uint8_t* scr, uint16_t name, int paty) {
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_pattern_sprite_over_planes)(uint8_t *scr, uint16_t name, int paty)
+{
     // uint16_t pat_addr = name << 5 ; //* 32;
     // int pat_palette = BITS(name, 13, 2);
     // int is_pat_pri = name & 0x8000;
@@ -402,9 +512,9 @@ void draw_pattern_sprite_over_planes(uint8_t* scr, uint16_t name, int paty) {
     // else
     //   pattern += paty * 4;
 
-    //uint8_t attrs = ( (name & 0x6000 ) >> 9 ) | ((name & 0x8000) ? PIXATTR_SPRITE_HIPRI : PIXATTR_SPRITE);
+    // uint8_t attrs = ( (name & 0x6000 ) >> 9 ) | ((name & 0x8000) ? PIXATTR_SPRITE_HIPRI : PIXATTR_SPRITE);
     const uint8_t attrs = ((name & 0x6000) >> 9) + ((name & 0x8000) >> 8) + PIXATTR_SPRITE;
-    //uint8_t attrs = ( (name >>9) & 0x70 ) | PIXATTR_SPRITE;
+    // uint8_t attrs = ( (name >>9) & 0x70 ) | PIXATTR_SPRITE;
 
     unsigned int pattern;
 
@@ -421,12 +531,13 @@ void draw_pattern_sprite_over_planes(uint8_t* scr, uint16_t name, int paty) {
         draw_pattern_nofliph_sprite_over_planes(scr, pattern, attrs);
 }
 
-static inline __attribute__((always_inline))
-void draw_pattern_planeB(uint8_t* scr, uint16_t name, int paty) {
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_pattern_planeB)(uint8_t *scr, uint16_t name, int paty)
+{
     // uint16_t pat_addr = name  << 5; // * 32;
     // uint8_t pat_palette = BITS(name, 13, 2);
     // unsigned int is_pat_pri = name & 0x8000;
-    //uint8_t *pattern = VRAM + pat_addr;
+    // uint8_t *pattern = VRAM + pat_addr;
 
     const uint8_t attrs = ((name & 0x6000) >> 9) + ((name & 0x8000) >> 8);
 
@@ -440,7 +551,7 @@ void draw_pattern_planeB(uint8_t* scr, uint16_t name, int paty) {
 
     //  if ((*(unsigned int *)pattern) == 0 ) return;
     // uint8_t *pattern = VRAM + ((name << 5) & 0xFFFF); //) pat_addr;
-    //uint32_t pattern = VRAM[(name & 0x07FF) << 5]; //) pat_addr;
+    // uint32_t pattern = VRAM[(name & 0x07FF) << 5]; //) pat_addr;
 
     // Horizontal flip ?
     if (name & 0x0800)
@@ -450,15 +561,15 @@ void draw_pattern_planeB(uint8_t* scr, uint16_t name, int paty) {
         draw_pattern_nofliph_planeB(scr, pattern, attrs);
 }
 
-static inline __attribute__((always_inline))
-void draw_pattern_planeA(uint8_t* scr, uint16_t name, int paty) {
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_pattern_planeA)(uint8_t *scr, uint16_t name, int paty)
+{
     // uint16_t pat_addr = name << 5; //* 32;
     // uint8_t pat_palette = BITS(name, 13, 2);
     // unsigned int is_pat_pri = name & 0x8000;
     // uint8_t *pattern = VRAM + pat_addr;
 
     const uint8_t attrs = ((name & 0x6000) >> 9) + ((name & 0x8000) >> 8);
-
 
     unsigned int pattern;
 
@@ -491,17 +602,18 @@ static uint16_t ntw_mask, nth_mask;
  *
  ******************************************************************************/
 
-static inline __attribute__((always_inline))
-unsigned int get_hscroll_vram(int line) {
-    switch (REG11_HSCROLL_MODE) {
-        case 0: // Full screen scrolling
-            return REG13_HSCROLL_ADDRESS;
-        case 1: // First 8 lines
-            return REG13_HSCROLL_ADDRESS + (line & 7) * 4;
-        case 2: // Every row
-            return REG13_HSCROLL_ADDRESS + (line & ~7) * 4;
-        case 3: // Every line
-            return REG13_HSCROLL_ADDRESS + line * 4;
+static inline __attribute__((always_inline)) unsigned int get_hscroll_vram(int line)
+{
+    switch (REG11_HSCROLL_MODE)
+    {
+    case 0: // Full screen scrolling
+        return REG13_HSCROLL_ADDRESS;
+    case 1: // First 8 lines
+        return REG13_HSCROLL_ADDRESS + (line & 7) * 4;
+    case 2: // Every row
+        return REG13_HSCROLL_ADDRESS + (line & ~7) * 4;
+    case 3: // Every line
+        return REG13_HSCROLL_ADDRESS + line * 4;
     }
 }
 
@@ -511,16 +623,17 @@ unsigned int get_hscroll_vram(int line) {
  *
  ******************************************************************************/
 //__attribute__((optimize("unroll-loops")))
-static inline __attribute__((always_inline))
-void draw_line_b(int line) {
-    uint8_t* scr = &render_buffer[PIX_OVERFLOW];
+// static inline __attribute__((always_inline)) 
+void __not_in_flash_func(draw_line_b)(int line)
+{
+    uint8_t *scr = &render_buffer[PIX_OVERFLOW];
 
     const unsigned int ntaddr = REG4_NAMETABLE_B;
     uint16_t scrollx = FETCH16VRAM(get_hscroll_vram(line) + 2) & 0x3FF;
-    const uint16_t* vsram = &VSRAM[1];
-    const uint8_t* end = scr + screen_width;
+    const uint16_t *vsram = &VSRAM[1];
+    const uint8_t *end = scr + screen_width;
 
-    //bool column_scrolling = BIT(gwenesis_vdp_regs[11], 2);
+    // bool column_scrolling = BIT(gwenesis_vdp_regs[11], 2);
     const bool column_scrolling = gwenesis_vdp_regs[11] & 0x4;
 
     // Invert horizontal scrolling (because it goes right, but we need to offset
@@ -531,7 +644,8 @@ void draw_line_b(int line) {
 
     unsigned int numcell = 0;
     scr -= patx;
-    while (scr < end) {
+    while (scr < end)
+    {
         // Calculate vertical scrolling for the current line
         uint16_t scrolly = *vsram + line;
         uint8_t row = (scrolly >> 3) & nth_mask;
@@ -540,7 +654,7 @@ void draw_line_b(int line) {
         // unsigned int nt = ntaddr + row * (2 * ntwidth);
         unsigned int nt = ntaddr + row * ntwidth_x2;
 
-        draw_pattern_planeB(scr, FETCH16VRAM(nt + __fast_mul(col , 2)), paty);
+        draw_pattern_planeB(scr, FETCH16VRAM(nt + __fast_mul(col, 2)), paty);
         col = (col + 1) & ntw_mask;
         scr += 8;
         numcell++;
@@ -557,18 +671,19 @@ void draw_line_b(int line) {
  *
  ******************************************************************************/
 //_attribute__((optimize("unroll-loops")))
-static inline __attribute__((always_inline))
-void draw_line_aw(int line) {
-    uint8_t* scr = &render_buffer[PIX_OVERFLOW];
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_line_aw)(int line)
+{
+    uint8_t *scr = &render_buffer[PIX_OVERFLOW];
 
     unsigned int ntaddr = REG2_NAMETABLE_A;
     uint16_t scrollx = FETCH16VRAM(get_hscroll_vram(line) + 0) & 0x3FF;
-    uint16_t* vsram = &VSRAM[0];
+    uint16_t *vsram = &VSRAM[0];
 
     // Check if we are in the window region only
     // if it's the case, we cancel the plane A drawing
     int Window_line = REG18_WINDOW_VPOS * 8;
-    //bool window_down = BIT(gwenesis_vdp_regs[18], 7);
+    // bool window_down = BIT(gwenesis_vdp_regs[18], 7);
     int window_down = gwenesis_vdp_regs[18] & 0x80;
 
     int PlanA_first = PlanA_firstcol;
@@ -576,15 +691,19 @@ void draw_line_aw(int line) {
     int Window_last = Window_lastcol;
     int Window_first = Window_firstcol;
 
-    if (window_down) {
-        if (line > Window_line) {
+    if (window_down)
+    {
+        if (line > Window_line)
+        {
             PlanA_first = PlanA_last = 0;
             Window_last = screen_width;
             Window_first = 0;
         }
     }
-    else {
-        if (line < Window_line) {
+    else
+    {
+        if (line < Window_line)
+        {
             PlanA_first = PlanA_last = 0;
             Window_last = screen_width;
             Window_first = 0;
@@ -592,10 +711,10 @@ void draw_line_aw(int line) {
     }
 
     // First draw A plane
-    uint8_t* pos = scr + PlanA_first; // scr + screen_width;
-    uint8_t* end = scr + PlanA_last; // scr + screen_width
+    uint8_t *pos = scr + PlanA_first; // scr + screen_width;
+    uint8_t *end = scr + PlanA_last;  // scr + screen_width
 
-    //bool column_scrolling = BIT(gwenesis_vdp_regs[11], 2);
+    // bool column_scrolling = BIT(gwenesis_vdp_regs[11], 2);
     const unsigned int column_scrolling = gwenesis_vdp_regs[11] & 0x4;
 
     // Invert horizontal scrolling (because it goes right, but we need to offset
@@ -606,7 +725,8 @@ void draw_line_aw(int line) {
 
     unsigned int numcell = 0;
     pos -= patx;
-    while (pos < end) {
+    while (pos < end)
+    {
         // Calculate vertical scrolling for the current line
         uint16_t scrolly = *vsram + line;
         uint8_t row = (scrolly >> 3) & nth_mask;
@@ -615,7 +735,7 @@ void draw_line_aw(int line) {
         // unsigned int nt = ntaddr + row * (2 * ntwidth);
         unsigned int nt = ntaddr + row * ntwidth_x2;
 
-        draw_pattern_planeA(pos, FETCH16VRAM(nt + __fast_mul(col , 2)), paty);
+        draw_pattern_planeA(pos, FETCH16VRAM(nt + __fast_mul(col, 2)), paty);
 
         col = (col + 1) & ntw_mask;
         pos += 8;
@@ -629,15 +749,16 @@ void draw_line_aw(int line) {
     // Second Draw Window Plane
     int row = line >> 3;
     int paty = line & 7;
-    //int wdwidth = (screen_width == 320 ? 64 : 32);
-    //unsigned int nt = base_w + row * 2 * wdwidth + Window_first / 4;
+    // int wdwidth = (screen_width == 320 ? 64 : 32);
+    // unsigned int nt = base_w + row * 2 * wdwidth + Window_first / 4;
 
     int wdwidth_x2 = (screen_width == 320 ? 128 : 64);
 
     unsigned int nt = base_w + row * wdwidth_x2 + Window_first / 4;
 
-    #pragma GCC unroll(64)
-    for (int i = Window_first / 8; i < Window_last / 8; ++i) {
+#pragma GCC unroll(64)
+    for (int i = Window_first / 8; i < Window_last / 8; ++i)
+    {
         draw_pattern_planeA(end, FETCH16VRAM(nt), paty);
         nt += 2;
         end += 8;
@@ -651,16 +772,17 @@ void draw_line_aw(int line) {
  ******************************************************************************/
 
 //__attribute__((optimize("unroll-loops")))
-static inline __attribute__((always_inline))
-void draw_sprites_over_planes(int line) {
-    uint8_t* scr = &render_buffer[PIX_OVERFLOW];
+///static inline __attribute__((always_inline)) void draw_sprites_over_planes(int line)
+static void __not_in_flash_func(draw_sprites_over_planes)(int line)
+{
+    uint8_t *scr = &render_buffer[PIX_OVERFLOW];
 
     //    scr = screen_buffer_line;
 
     // uint8_t mask = mode_h40 ? 0x7E : 0x7F;
     // uint8_t *start_table = VRAM + ((gwenesis_vdp_regs[5] & mask) << 9);
 
-    uint8_t* start_table = VRAM + REG5_SAT_ADDRESS;
+    uint8_t *start_table = VRAM + REG5_SAT_ADDRESS;
 
     // This is both the size of the table as seen by the VDP
     // *and* the maximum number of sprites that are processed
@@ -672,16 +794,15 @@ void draw_sprites_over_planes(int line) {
     bool masking = false, one_sprite_nonzero = false; // overdraw = false;
     int sidx = 0, num_sprites = 0, num_pixels = 0;
 
-    for (int i = 0; (i < SPRITE_TABLE_SIZE) && sidx < (SPRITE_TABLE_SIZE); ++i) {
-        uint8_t* table = start_table + __fast_mul(sidx, 8);
-        uint8_t* cache = SAT_CACHE + __fast_mul(sidx, 8);
-        //uint8_t *cache = start_table + sidx*8;
-
+    for (int i = 0; (i < SPRITE_TABLE_SIZE) && sidx < (SPRITE_TABLE_SIZE); ++i)
+    {
+        uint8_t *table = start_table + __fast_mul(sidx, 8);
+        uint8_t *cache = SAT_CACHE + __fast_mul(sidx, 8);
+        // uint8_t *cache = start_table + sidx*8;
 
         int sy = ((cache[0] & 0x3) << 8) | cache[1];
         int sx = ((table[6] & 0x3) << 8) | table[7];
         uint16_t name = (table[4] << 8) | table[5];
-
 
         int sh = BITS(cache[2], 0, 2) + 1;
         int link = BITS(cache[3], 0, 7);
@@ -692,7 +813,8 @@ void draw_sprites_over_planes(int line) {
         int sw = BITS(table[2], 2, 2) + 1;
 
         sy -= 128;
-        if ((line >= sy) && (line < sy + __fast_mul(sh, 8))) {
+        if ((line >= sy) && (line < sy + __fast_mul(sh, 8)))
+        {
             // Sprite masking: a sprite on column 0 masks
             // any lower-priority sprite, but with the following conditions
             //   * it only works from the second visible sprite on each line
@@ -701,7 +823,8 @@ void draw_sprites_over_planes(int line) {
             // Notice that we need to continue parsing the table after masking
             // to see if we reach a pixel overflow (because it would affect masking
             // on next line).
-            if (sx == 0) {
+            if (sx == 0)
+            {
                 if (one_sprite_nonzero || (sprite_overflow == line - 1))
                     masking = true;
             }
@@ -714,20 +837,25 @@ void draw_sprites_over_planes(int line) {
                 row = sh - row - 1;
 
             sx -= 128;
-            if ((sx > (__fast_mul(-sw, 8))) && (sx < screen_width) && !masking) {
+            if ((sx > (__fast_mul(-sw, 8))) && (sx < screen_width) && !masking)
+            {
                 name += row;
 
-                if (isfliph) {
+                if (isfliph)
+                {
                     name += sh * (sw - 1);
 
-                    for (int p = 0; (p < sw) && (num_pixels < MAX_PIXELS_PER_LINE); p++) {
+                    for (int p = 0; (p < sw) && (num_pixels < MAX_PIXELS_PER_LINE); p++)
+                    {
                         draw_pattern_sprite_over_planes(scr + sx + __fast_mul(p, 8), name, paty);
                         name -= sh;
                         num_pixels += 8;
                     }
                 }
-                else {
-                    for (int p = 0; (p < sw) && (num_pixels < MAX_PIXELS_PER_LINE); p++) {
+                else
+                {
+                    for (int p = 0; (p < sw) && (num_pixels < MAX_PIXELS_PER_LINE); p++)
+                    {
                         draw_pattern_sprite_over_planes(scr + sx + __fast_mul(p, 8), name, paty);
                         name += sh;
                         num_pixels += 8;
@@ -737,7 +865,8 @@ void draw_sprites_over_planes(int line) {
             else
                 num_pixels += sw * 8;
 
-            if (num_pixels >= MAX_PIXELS_PER_LINE) {
+            if (num_pixels >= MAX_PIXELS_PER_LINE)
+            {
                 sprite_overflow = line;
                 break;
             }
@@ -745,7 +874,8 @@ void draw_sprites_over_planes(int line) {
                 break;
         }
 
-        if (link == 0) break;
+        if (link == 0)
+            break;
         sidx = link;
     }
 
@@ -753,17 +883,17 @@ void draw_sprites_over_planes(int line) {
     //      sprite_collision = true;
 }
 
-static inline __attribute__((always_inline))
-void draw_sprites(int line) {
-    uint8_t* scr = &sprite_buffer[PIX_OVERFLOW];
-
+//static inline __attribute__((always_inline)) 
+static void __not_in_flash_func(draw_sprites)(int line)
+{
+    uint8_t *scr = &sprite_buffer[PIX_OVERFLOW];
 
     //    scr = screen_buffer_line; //&sprite_buffer[PIX_OVERFLOW];
 
     // uint8_t mask = mode_h40 ? 0x7E : 0x7F;
     // uint8_t *start_table = VRAM + ((gwenesis_vdp_regs[5] & mask) << 9);
 
-    uint8_t* start_table = VRAM + REG5_SAT_ADDRESS;
+    uint8_t *start_table = VRAM + REG5_SAT_ADDRESS;
 
     // This is both the size of the table as seen by the VDP
     // *and* the maximum number of sprites that are processed
@@ -775,12 +905,12 @@ void draw_sprites(int line) {
     bool masking = false, one_sprite_nonzero = false; // overdraw = false;
     int sidx = 0, num_sprites = 0, num_pixels = 0;
 
+    for (int i = 0; i < SPRITE_TABLE_SIZE && sidx < SPRITE_TABLE_SIZE; ++i)
+    {
+        uint8_t *table = start_table + __fast_mul(sidx, 8);
+        uint8_t *cache = start_table + __fast_mul(sidx, 8);
 
-    for (int i = 0; i < SPRITE_TABLE_SIZE && sidx < SPRITE_TABLE_SIZE; ++i) {
-        uint8_t* table = start_table + __fast_mul(sidx, 8);
-        uint8_t* cache = start_table + __fast_mul(sidx, 8);
-
-        //uint8_t *cache = SAT_CACHE + sidx * 8;
+        // uint8_t *cache = SAT_CACHE + sidx * 8;
 
         int sy = ((cache[0] & 0x3) << 8) | cache[1];
         int sx = ((table[6] & 0x3) << 8) | table[7];
@@ -795,7 +925,8 @@ void draw_sprites(int line) {
         int sw = BITS(table[2], 2, 2) + 1;
 
         sy -= 128;
-        if (line >= sy && line < sy + __fast_mul(sh, 8)) {
+        if (line >= sy && line < sy + __fast_mul(sh, 8))
+        {
             // Sprite masking: a sprite on column 0 masks
             // any lower-priority sprite, but with the following conditions
             //   * it only works from the second visible sprite on each line
@@ -804,7 +935,8 @@ void draw_sprites(int line) {
             // Notice that we need to continue parsing the table after masking
             // to see if we reach a pixel overflow (because it would affect masking
             // on next line).
-            if (sx == 0) {
+            if (sx == 0)
+            {
                 if (one_sprite_nonzero || sprite_overflow == line - 1)
                     masking = true;
             }
@@ -817,19 +949,24 @@ void draw_sprites(int line) {
                 row = sh - row - 1;
 
             sx -= 128;
-            if (sx > -__fast_mul(sw, 8) && sx < screen_width && !masking) {
+            if (sx > -__fast_mul(sw, 8) && sx < screen_width && !masking)
+            {
                 name += row;
 
-                if (isfliph) {
+                if (isfliph)
+                {
                     name += sh * (sw - 1);
-                    for (int p = 0; p < sw && num_pixels < MAX_PIXELS_PER_LINE; p++) {
+                    for (int p = 0; p < sw && num_pixels < MAX_PIXELS_PER_LINE; p++)
+                    {
                         draw_pattern_sprite(scr + sx + __fast_mul(p, 8), name, paty);
                         name -= sh;
                         num_pixels += 8;
                     }
                 }
-                else {
-                    for (int p = 0; p < sw && num_pixels < MAX_PIXELS_PER_LINE; p++) {
+                else
+                {
+                    for (int p = 0; p < sw && num_pixels < MAX_PIXELS_PER_LINE; p++)
+                    {
                         draw_pattern_sprite(scr + sx + __fast_mul(p, 8), name, paty);
                         name += sh;
                         num_pixels += 8;
@@ -839,7 +976,8 @@ void draw_sprites(int line) {
             else
                 num_pixels += __fast_mul(sw, 8);
 
-            if (num_pixels >= MAX_PIXELS_PER_LINE) {
+            if (num_pixels >= MAX_PIXELS_PER_LINE)
+            {
                 sprite_overflow = line;
                 break;
             }
@@ -861,9 +999,10 @@ void draw_sprites(int line) {
  *  Parse PLANE A/B size,scrolling at the start of image rendering
  *
  ******************************************************************************/
-//static unsigned short current_line[320];
+// static unsigned short current_line[320];
 
-void __time_critical_func(gwenesis_vdp_render_config)() {
+void __time_critical_func(gwenesis_vdp_render_config)()
+{
     mode_h40 = REG12_MODE_H40;
     mode_pal = REG1_PAL;
 
@@ -882,7 +1021,6 @@ void __time_critical_func(gwenesis_vdp_render_config)() {
     else
         base_w = ((REG3_NAMETABLE_W & 0x1f) << 11);
 
-
     bool window_right = BIT(gwenesis_vdp_regs[17], 7);
 
     // int window_is_bugged = 0;
@@ -892,7 +1030,8 @@ void __time_critical_func(gwenesis_vdp_render_config)() {
     Window_firstcol = 0;
     Window_lastcol = 0;
 
-    if (window_right) {
+    if (window_right)
+    {
         Window_firstcol = REG17_WINDOW_HPOS * 16;
         Window_lastcol = screen_width;
 
@@ -902,7 +1041,8 @@ void __time_critical_func(gwenesis_vdp_render_config)() {
         PlanA_firstcol = 0;
         PlanA_lastcol = Window_firstcol;
     }
-    else {
+    else
+    {
         Window_firstcol = 0;
         Window_lastcol = REG17_WINDOW_HPOS * 16;
         if (Window_lastcol > screen_width)
@@ -915,45 +1055,66 @@ void __time_critical_func(gwenesis_vdp_render_config)() {
     }
 }
 
+static void printbin16(int16_t v)
+{
+    for (int i = 15; i >= 0; i--)
+    {
+        printf("%d", (v >> i) & 1);
+    }
+}
+static void printbin8(int8_t v)
+{
+    for (int i = 7; i >= 0; i--)
+    {
+        printf("%d", (v >> i) & 1);
+    }
+}
 /******************************************************************************
  *
  *  Render a line on screen
  *  Get selected line and render it on screen processing each plane.
  *
  ******************************************************************************/
-
-void gwenesis_vdp_render_line(int line) {
-    uint8_t* line_buffer = &screen_buffer_line[__fast_mul(line, screen_width)];
+uint8_t tempbuffer[GWENESIS_SCREEN_WIDTH];
+void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint16_t *dvi_line_buffer, const uint16_t *genesispalette)
+{
+    uint8_t *line_buffer =  tempbuffer;// &screen_buffer_line[__fast_mul(line, screen_width)];
     mode_h40 = REG12_MODE_H40;
-    //mode_pal = REG1_PAL;
-
+    // mode_pal = REG1_PAL;
+    // printf("    Line: %3d\n", line);
     vdpg_log(__FUNCTION__, ": %3d", line);
 
-    //unsigned int line = scan_line;
-    // if (line == 0) gwenesis_vdp_render_config();
+    // unsigned int line = scan_line;
+    //  if (line == 0) gwenesis_vdp_render_config();
 
     // interlace mode not implemented
     if (BITS(gwenesis_vdp_regs[12], 1, 2) != 0)
+    {
+        printf("Interlace mode not implemented\n");
         return;
+    }
 
     if (line >= (REG1_PAL ? 240 : 224))
         return;
 
     // Disable display >> black SCREEN
-    if (REG0_DISABLE_DISPLAY) {
+    if (REG0_DISABLE_DISPLAY)
+    {
+        // printf("Display is disabled\n");
         memset(line_buffer, 0, screen_width);
         return;
     }
 
     // Display is not enabled. fill with background colour
-    if (REG1_DISP_ENABLED == 0) {
+    if (REG1_DISP_ENABLED == 0)
+    {
+        // printf("Display is not enabled\n");
         memset(line_buffer, 0, screen_width);
         return;
     }
 
-
-    const uint8_t* pb = &render_buffer[PIX_OVERFLOW];
-    uint8_t* ps = &sprite_buffer[PIX_OVERFLOW];
+    const uint8_t *pb = &render_buffer[PIX_OVERFLOW];
+    uint8_t *ps = &sprite_buffer[PIX_OVERFLOW];
 
     if (MODE_SHI)
         memset(ps, 0, GWENESIS_SCREEN_WIDTH);
@@ -962,43 +1123,60 @@ void gwenesis_vdp_render_line(int line) {
     draw_line_aw(line);
 
     /* Mode Highlight/shadow is enabled */
-    if (MODE_SHI) {
+    if (MODE_SHI)
+    {
+
         draw_sprites(line);
 
-        for (int x = 0; x < screen_width; x++) {
+        for (int x = 0; x < screen_width; x++)
+        {
             const uint8_t plane = pb[x];
             const uint8_t sprite = ps[x];
 
-            if ((plane & 0xC0) < (sprite & 0xC0)) {
-                switch (sprite & 0x3F) {
-                    // Palette=3, Sprite=14 :> draw plane, force highlight
-                    case 0x3E:
-                        line_buffer[x] = 0x8410 | plane >> 1;
-                        break;
-                    // Palette=3, Sprite=15 :> draw plane, force shadow
-                    case 0x3F:
-                        line_buffer[x] = plane >> 1;
-                        break;
-                    // draw sprite, normal
-                    default:
-                        line_buffer[x] = sprite;
-                        break;
+            if ((plane & 0xC0) < (sprite & 0xC0))
+            {
+                switch (sprite & 0x3F)
+                {
+                // Palette=3, Sprite=14 :> draw plane, force highlight
+                case 0x3E:
+                    line_buffer[x] = 0x8410 | plane >> 1;
+                    break;
+                // Palette=3, Sprite=15 :> draw plane, force shadow
+                case 0x3F:
+                    line_buffer[x] = plane >> 1;
+                    break;
+                // draw sprite, normal
+                default:
+                    line_buffer[x] = sprite;
+                    break;
                 }
             }
-            else {
+            else
+            {
                 line_buffer[x] = plane;
             }
         }
 
         /* Normal mode*/
     }
-    else {
+    else
+    {
         draw_sprites_over_planes(line);
         memcpy(line_buffer, pb, screen_width);
     }
+    // int column = 0;
+    for (int x = 0; x < screen_width; x++)
+    {
+        //int color = CRAM[line_buffer[x] & 0x3F];
+
+        dvi_line_buffer[x] = genesispalette[line_buffer[x]];
+       
+    }
+    
 }
 
-void gwenesis_vdp_gfx_save_state() {
+void gwenesis_vdp_gfx_save_state()
+{
     /*
     SaveState* state;
     state = saveGwenesisStateOpenForWrite("vdp_gfx");
@@ -1018,7 +1196,8 @@ void gwenesis_vdp_gfx_save_state() {
     */
 }
 
-void gwenesis_vdp_gfx_load_state() {
+void gwenesis_vdp_gfx_load_state()
+{
     /*
       SaveState* state = saveGwenesisStateOpenForRead("vdp_gfx");
       saveGwenesisStateGetBuffer(state, "render_buffer", render_buffer, sizeof(render_buffer));

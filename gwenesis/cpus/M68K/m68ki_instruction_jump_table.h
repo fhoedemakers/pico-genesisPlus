@@ -1,3 +1,4 @@
+// static void (* const __not_in_flash_func(m68ki_instruction_jump_table)[])(void) =
 static void  (* const m68ki_instruction_jump_table[])(void) =
 {
   m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, m68k_op_ori_8_d, 
