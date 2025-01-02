@@ -567,19 +567,20 @@ int main()
 
     stdio_init_all();
     sleep_ms(500);
-    printf("Starting Master System Emulator\n");
+    printf("Starting Genesis System Emulator\n");
     printf("CPU freq: %d\n", clock_get_hz(clk_sys));
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
-    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 256, true);
+    
+    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 256, true, true);
     bool showSplash = true;
 
     while (true)
     {
-#if 0
+#if 1
         if (strlen(selectedRom) == 0 || reset == true)
         {
-            menu("Pico-SMS+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
+            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
         }
 #endif
         scaleMode8_7_ = Frens::applyScreenMode(ScreenMode::MAX);
@@ -605,7 +606,7 @@ int main()
         // Todo: Initialize emulator
         printf("Starting game\n");
         init_emulator_mem();
-        load_cartridge(0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
+        load_cartridge(ROM_FILE_ADDR); // 0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
         power_on();
         reset_emulation();
         emulate();
