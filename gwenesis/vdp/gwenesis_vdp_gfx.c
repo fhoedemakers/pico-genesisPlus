@@ -1075,10 +1075,10 @@ static void printbin8(int8_t v)
  *  Get selected line and render it on screen processing each plane.
  *
  ******************************************************************************/
-uint8_t tempbuffer[GWENESIS_SCREEN_WIDTH];
-void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint16_t *dvi_line_buffer, const uint16_t *genesispalette)
+// uint8_t tempbuffer[GWENESIS_SCREEN_WIDTH];
+void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint8_t *frame_line_buffer)
 {
-    uint8_t *line_buffer =  tempbuffer;// &screen_buffer_line[__fast_mul(line, screen_width)];
+    uint8_t *line_buffer =  frame_line_buffer;// &screen_buffer_line[__fast_mul(line, screen_width)];
     mode_h40 = REG12_MODE_H40;
     // mode_pal = REG1_PAL;
     // printf("    Line: %3d\n", line);
@@ -1165,13 +1165,13 @@ void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint16_t *dvi_line_
         memcpy(line_buffer, pb, screen_width);
     }
     // int column = 0;
-    for (int x = 0; x < screen_width; x++)
-    {
-        //int color = CRAM[line_buffer[x] & 0x3F];
+    // for (int x = 0; x < screen_width; x++)
+    // {
+    //     //int color = CRAM[line_buffer[x] & 0x3F];
 
-        dvi_line_buffer[x] = genesispalette[line_buffer[x]];
+    //     dvi_line_buffer[x] = genesispalette[line_buffer[x]];
        
-    }
+    // }
     
 }
 

@@ -377,6 +377,26 @@ void __not_in_flash_func(process)(void)
     }
 }
 
+uint8_t maxkol = 0;
+void __not_in_flash_func(processEmulatorScanLine)(uint8_t *current_line, uint16_t *buffer, int screenWidth)
+{
+    for (int kol = 0; kol < screenWidth; kol += 4)
+    {
+        buffer[kol] = GenesisPalette[current_line[kol]];
+        buffer[kol + 1] = GenesisPalette[current_line[kol + 1]];
+        buffer[kol + 2] = GenesisPalette[current_line[kol + 2]];
+        buffer[kol + 3] = GenesisPalette[current_line[kol + 3]];
+    }
+    //  for (int kol = 0; kol < screenWidth; kol ++)
+    // {
+    //     if ( current_line[kol] > maxkol)
+    //     {
+    //         maxkol = current_line[kol];
+    //         printf("maxkol %d\n", maxkol);
+    //     }
+    //     buffer[kol] = GenesisPalette[current_line[kol]];
+    // }
+}
 /* Clocks and synchronization */
 /* system clock is video clock */
 int system_clock;
@@ -390,7 +410,7 @@ int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = false;      // was true
-bool frameskip = true;    // was true
+bool frameskip = false;    // was true
 int audio_enabled = 0;
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 0;
@@ -405,7 +425,7 @@ void __time_critical_func(emulate)()
 {
 
     // FH gwenesis_vdp_set_buffer((uint8_t *)SCREEN);
-    dvi::DVI::LineBuffer *current_dvi_buffer = nullptr;
+    uint8_t tmpbuffer[SCREENWIDTH];
     while (!reboot)
     {
         /* Eumulator loop */
@@ -438,7 +458,7 @@ void __time_critical_func(emulate)()
         {
             // printf("%d\n", scan_line);
 
-            uint16_t *line_buffer = nullptr;
+            uint8_t  *frameline_buffer = tmpbuffer;
             
 
             /* CPUs */
@@ -447,20 +467,14 @@ void __time_critical_func(emulate)()
                 z80_run(system_clock + VDP_CYCLES_PER_LINE);
             /* Video */
             // Interlace mode
-            if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0)
-            {
-                current_dvi_buffer = nullptr;
+            // if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0)
+            // {
                 if (scan_line < 240)
                 {
-                    current_dvi_buffer = dvi_->getLineBuffer();
-                    line_buffer = current_dvi_buffer->data();
+                   frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
                 }
-                gwenesis_vdp_render_line(scan_line, line_buffer, GenesisPalette); /* render scan_line */
-                if (line_buffer)
-                {
-                    dvi_->setLineBuffer(scan_line, current_dvi_buffer);
-                }
-            }
+                gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
+            // }
 
             // On these lines, the line counter interrupt is reloaded
             if (scan_line == 0 || scan_line > screen_height)
@@ -500,7 +514,8 @@ void __time_critical_func(emulate)()
             {
                 z80_irq_line(0);
                 // FRAMESKIP every 3rd frame
-                drawFrame = frameskip && frame % 3 != 0;
+                // drawFrame = frameskip && frame % 3 != 0;
+                drawFrame = 1;
                 // if (frameskip && frame % 3 == 0) {
                 //     drawFrame = 0;
                 // } else {
@@ -510,7 +525,7 @@ void __time_critical_func(emulate)()
 
             system_clock += VDP_CYCLES_PER_LINE;
         }
-
+        Frens::markFrameReadyForReendering();
         frame++;
         if (limit_fps)
         {
@@ -603,6 +618,8 @@ int main()
 
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
 #endif
+        Frens::SetFrameBufferProcessScanLineFunction(processEmulatorScanLine);
+
         // Todo: Initialize emulator
         printf("Starting game\n");
         init_emulator_mem();
