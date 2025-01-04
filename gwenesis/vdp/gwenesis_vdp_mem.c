@@ -55,6 +55,7 @@ void vdpm_log(const char *subs, const char *fmt, ...) {
 #define vdpm_log(...)
 #endif
 
+void genesis_set_palette(const uint8_t i, const uint32_t color);
 //#define _DMA_TRACE_
 
 /* Setup VDP Memories */
@@ -415,7 +416,7 @@ void gwenesis_vdp_dma_fill(unsigned short value) {
                 uint8_t addr = (address_reg & 0x7f) >> 1;
                 CRAM[addr] = fifo[3];
 
-               // FH TODO graphics_set_palette(addr, RGB888(CRAM_R(CRAM[addr]), CRAM_G(CRAM[addr]), CRAM_B(CRAM[addr])));
+                genesis_set_palette(addr, CRAM[addr]);
 
                 address_reg += REG15_DMA_INCREMENT;
                 src_addr_low++;
@@ -500,7 +501,7 @@ void gwenesis_vdp_dma_m68k() {
                     uint8_t addr = (address_reg & 0x7f) >> 1;
                     CRAM[addr] = value;
 
-                    // FH TODO graphics_set_palette(addr, RGB888(CRAM_R(value), CRAM_G(value), CRAM_B(value)));
+                    genesis_set_palette(addr, value);
 
                     address_reg += REG15_DMA_INCREMENT;
                     src_addr += 2;
@@ -550,7 +551,7 @@ void gwenesis_vdp_dma_m68k() {
                     uint8_t addr = (address_reg & 0x7f) >> 1;
                     CRAM[addr] = value;
 
-                    // FH TODO graphics_set_palette(addr, RGB888(CRAM_R(value), CRAM_G(value), CRAM_B(value)));
+                    genesis_set_palette(addr, value);
 
                     address_reg += REG15_DMA_INCREMENT;
                     src_addr += 2;
@@ -771,8 +772,7 @@ void gwenesis_vdp_write_data_port_16(unsigned int value) {
         {
             uint8_t addr = (address_reg & 0x7f) >> 1;
             CRAM[addr] = value;
-
-            // FH TODO graphics_set_palette(addr, RGB888(CRAM_R(value), CRAM_G(value), CRAM_B(value)));
+           genesis_set_palette(addr, value);
 
             address_reg += REG15_DMA_INCREMENT;
             address_reg &= 0xFFFF;
