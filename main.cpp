@@ -39,7 +39,7 @@ bool isFatalError = false;
 static FATFS fs;
 char *romName;
 
-static bool fps_enabled = false;
+static bool fps_enabled = true;
 static uint32_t start_tick_us = 0;
 static uint32_t fps = 0;
 static char fpsString[3] = "00";
@@ -121,6 +121,8 @@ const uint16_t __not_in_flash_func(GenesisPalette)[512] = {
     0xFC0, 0xFC3, 0xFC5, 0xFC7, 0xFC9, 0xFCA, 0xFCC, 0xFCF,
     0xFF0, 0xFF3, 0xFF5, 0xFF7, 0xFF9, 0xFFA, 0xFFC, 0xFFF};
 
+uint16_t __scratch_y("gen_palette") palette444[256];
+
 namespace
 {
     constexpr uint32_t CPUFreqKHz = 266000; // 252000;
@@ -166,64 +168,6 @@ void __not_in_flash_func(processaudio)(int offset)
     //     ring.advanceWritePointer(n);
     //     samples -= n;
     // }
-}
-
-extern "C" void __not_in_flash_func(render_line)(int line, const uint8_t *buffer)
-{
-    // DVI top margin has #MARGINTOP lines
-    // DVI bottom margin has #MARGINBOTTOM lines
-    // DVI usable screen estate: MARGINTOP .. (240 - #MARGINBOTTOM)
-    // Genesis 320×224, 256×224, 320x240 (some PAL games), 256x240 (some PAL games),
-    //         320×448, 256×448, 320x480 (some PAL games), 256x480 (some PAL games)
-    // Emulator loops from scanline 0 to 261
-    // Audio needs to be processed per scanline
-
-    processaudio(line);
-    // Adjust line number to center the emulator display
-    line += MARGINTOP;
-    // Only render lines that are visible on the screen, keeping into account top and bottom margins
-    if (line < MARGINTOP || line >= 240 - MARGINBOTTOM)
-        return;
-
-    auto b = dvi_->getLineBuffer();
-    uint16_t *sbuffer;
-    if (buffer)
-    {
-        // uint16_t *sbuffer = b->data() + 32 + (IS_GG ? 48 : 0);
-        // for (int i = screenCropX; i < BMP_WIDTH - screenCropX; i++)
-        // {
-        //     sbuffer[i - screenCropX] = palette444[(buffer[i + BMP_X_OFFSET]) & 31];
-        // }
-    }
-    else
-    {
-        sbuffer = b->data() + 32;
-        __builtin_memset(sbuffer, 0, 512);
-    }
-    // Display frame rate
-    if (fps_enabled && line >= FPSSTART && line < FPSEND)
-    {
-        WORD *fpsBuffer = b->data() + 40;
-        int rowInChar = line % 8;
-        for (auto i = 0; i < 2; i++)
-        {
-            char firstFpsDigit = fpsString[i];
-            char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
-            for (auto bit = 0; bit < 8; bit++)
-            {
-                if (fontSlice & 1)
-                {
-                    *fpsBuffer++ = fpsfgcolor;
-                }
-                else
-                {
-                    *fpsBuffer++ = fpsbgcolor;
-                }
-                fontSlice >>= 1;
-            }
-        }
-    }
-    dvi_->setLineBuffer(line, b);
 }
 
 int ProcessAfterFrameIsRendered()
@@ -377,15 +321,47 @@ void __not_in_flash_func(process)(void)
     }
 }
 
+const uint8_t __not_in_flash_func(paletteBrightness)[] = {0, 52, 87, 116, 144, 172, 206, 255};
+
+extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
+{
+    uint8_t b = paletteBrightness[(color >> 9) & 0x0F];
+    uint8_t g = paletteBrightness[(color >> 5) & 0x0F];
+    uint8_t r = paletteBrightness[(color >> 1) & 0x0F];
+    palette444[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    // palette444[index] =
+}
 uint8_t maxkol = 0;
-void __not_in_flash_func(processEmulatorScanLine)(uint8_t *current_line, uint16_t *buffer, int screenWidth)
+void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_line, uint16_t *buffer, int screenWidth)
 {
     for (int kol = 0; kol < screenWidth; kol += 4)
     {
-        buffer[kol] = GenesisPalette[current_line[kol]];
-        buffer[kol + 1] = GenesisPalette[current_line[kol + 1]];
-        buffer[kol + 2] = GenesisPalette[current_line[kol + 2]];
-        buffer[kol + 3] = GenesisPalette[current_line[kol + 3]];
+        buffer[kol] = palette444[current_line[kol] & 0x3f];
+        buffer[kol + 1] = palette444[current_line[kol + 1] & 0x3f];
+        buffer[kol + 2] = palette444[current_line[kol + 2] & 0x3f];
+        buffer[kol + 3] = palette444[current_line[kol + 3] & 0x3f];
+    }
+    if (fps_enabled && line >= FPSSTART && line < FPSEND)
+    {
+        WORD *fpsBuffer = buffer + 5;
+        int rowInChar = line % 8;
+        for (auto i = 0; i < 2; i++)
+        {
+            char firstFpsDigit = fpsString[i];
+            char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
+            for (auto bit = 0; bit < 8; bit++)
+            {
+                if (fontSlice & 1)
+                {
+                    *fpsBuffer++ = fpsfgcolor;
+                }
+                else
+                {
+                    *fpsBuffer++ = fpsbgcolor;
+                }
+                fontSlice >>= 1;
+            }
+        }
     }
     //  for (int kol = 0; kol < screenWidth; kol ++)
     // {
@@ -405,12 +381,12 @@ int scan_line;
 unsigned int frame_counter = 0;
 unsigned int drawFrame = 1;
 int z80_enable_mode = 2;
-bool interlace = true;  // was true
+bool interlace = true; // was true
 int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
-bool limit_fps = false;      // was true
-bool frameskip = false;    // was true
+bool limit_fps = true; // was true
+bool frameskip = false; // was true
 int audio_enabled = 0;
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 0;
@@ -438,7 +414,7 @@ void __time_critical_func(emulate)()
         // Printf values
 #if 0
         printf("frame %d, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", frame, is_pal, screen_width, screen_height, lines_per_frame);
-#endif        
+#endif
         // graphics_set_buffer(buffer, screen_width, screen_height);
         // TODO: move to separate function graphics_set_dimensions ?
         // FH graphics_set_buffer((uint8_t*)SCREEN, screen_width, screen_height);
@@ -458,8 +434,7 @@ void __time_critical_func(emulate)()
         {
             // printf("%d\n", scan_line);
 
-            uint8_t  *frameline_buffer = tmpbuffer;
-            
+            uint8_t *frameline_buffer = tmpbuffer;
 
             /* CPUs */
             m68k_run(system_clock + VDP_CYCLES_PER_LINE);
@@ -469,11 +444,13 @@ void __time_critical_func(emulate)()
             // Interlace mode
             // if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0)
             // {
-                if (scan_line < 240)
-                {
-                   frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
-                }
-                gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
+            // if (drawFrame) {
+            if (scan_line < 240)
+            {
+                frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
+            }
+            gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
+            // }
             // }
 
             // On these lines, the line counter interrupt is reloaded
@@ -525,7 +502,11 @@ void __time_critical_func(emulate)()
 
             system_clock += VDP_CYCLES_PER_LINE;
         }
-        Frens::markFrameReadyForReendering();
+        if (drawFrame)
+        {
+            Frens::markFrameReadyForReendering();
+        }
+        ProcessAfterFrameIsRendered();
         frame++;
         if (limit_fps)
         {
@@ -586,7 +567,7 @@ int main()
     printf("CPU freq: %d\n", clock_get_hz(clk_sys));
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
-    
+
     isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 256, true, true);
     bool showSplash = true;
 
