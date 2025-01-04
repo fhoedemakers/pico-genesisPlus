@@ -40,8 +40,8 @@ static FATFS fs;
 char *romName;
 
 static bool fps_enabled = true;
-static uint32_t start_tick_us = 0;
-static uint32_t fps = 0;
+static uint64_t start_tick_us = 0;
+static uint64_t fps = 0;
 static char fpsString[3] = "00";
 #define fpsfgcolor 0;     // black
 #define fpsbgcolor 0xFFF; // white
@@ -125,7 +125,8 @@ uint16_t __scratch_y("gen_palette") palette444[256];
 
 namespace
 {
-    constexpr uint32_t CPUFreqKHz = 266000; // 252000;
+    // https://github.com/orgs/micropython/discussions/15722
+    constexpr uint32_t CPUFreqKHz = 340000; //266000; 
 }
 
 int sampleIndex = 0;
@@ -187,7 +188,7 @@ int ProcessAfterFrameIsRendered()
     if (fps_enabled)
     {
         // calculate fps and round to nearest value (instead of truncating/floor)
-        uint32_t tick_us = Frens::time_us() - start_tick_us;
+        uint64_t tick_us = Frens::time_us() - start_tick_us;
         fps = (1000000 - 1) / tick_us + 1;
         start_tick_us = Frens::time_us();
         fpsString[0] = '0' + (fps / 10);
@@ -385,7 +386,7 @@ bool interlace = true; // was true
 int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
-bool limit_fps = true; // was true
+bool limit_fps = false; // was true
 bool frameskip = false; // was true
 int audio_enabled = 0;
 bool sn76489_enabled = true;
