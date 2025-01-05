@@ -121,12 +121,16 @@ const uint16_t __not_in_flash_func(GenesisPalette)[512] = {
     0xFC0, 0xFC3, 0xFC5, 0xFC7, 0xFC9, 0xFCA, 0xFCC, 0xFCF,
     0xFF0, 0xFF3, 0xFF5, 0xFF7, 0xFF9, 0xFFA, 0xFFC, 0xFFF};
 
-uint16_t __scratch_y("gen_palette") palette444[256];
-
+uint16_t __scratch_y("gen_palette1") palette444_1[256];
+uint16_t __scratch_y("gen_palette2") palette444_2[256];
+uint16_t *palette444 = palette444_1;
+#ifndef CPUKFREQKHZ
+#define CPUKFREQKHZ 252000
+#endif
 namespace
 {
     // https://github.com/orgs/micropython/discussions/15722
-    constexpr uint32_t CPUFreqKHz = 340000; //266000; 
+    constexpr uint32_t CPUFreqKHz = CPUKFREQKHZ; // 340000; //266000;
 }
 
 int sampleIndex = 0;
@@ -330,39 +334,49 @@ extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
     uint8_t g = paletteBrightness[(color >> 5) & 0x0F];
     uint8_t r = paletteBrightness[(color >> 1) & 0x0F];
     palette444[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+
     // palette444[index] =
 }
 uint8_t maxkol = 0;
 void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_line, uint16_t *buffer, int screenWidth)
 {
-    for (int kol = 0; kol < screenWidth; kol += 4)
+    if (line < 224)
     {
-        buffer[kol] = palette444[current_line[kol] & 0x3f];
-        buffer[kol + 1] = palette444[current_line[kol + 1] & 0x3f];
-        buffer[kol + 2] = palette444[current_line[kol + 2] & 0x3f];
-        buffer[kol + 3] = palette444[current_line[kol + 3] & 0x3f];
-    }
-    if (fps_enabled && line >= FPSSTART && line < FPSEND)
-    {
-        WORD *fpsBuffer = buffer + 5;
-        int rowInChar = line % 8;
-        for (auto i = 0; i < 2; i++)
+        for (int kol = 0; kol < screenWidth; kol += 4)
         {
-            char firstFpsDigit = fpsString[i];
-            char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
-            for (auto bit = 0; bit < 8; bit++)
+
+            buffer[kol] = palette444[current_line[kol] & 0x3f];
+            buffer[kol + 1] = palette444[current_line[kol + 1] & 0x3f];
+            buffer[kol + 2] = palette444[current_line[kol + 2] & 0x3f];
+            buffer[kol + 3] = palette444[current_line[kol + 3] & 0x3f];
+        }
+
+        if (fps_enabled && line >= FPSSTART && line < FPSEND)
+        {
+            WORD *fpsBuffer = buffer + 5;
+            int rowInChar = line % 8;
+            for (auto i = 0; i < 2; i++)
             {
-                if (fontSlice & 1)
+                char firstFpsDigit = fpsString[i];
+                char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
+                for (auto bit = 0; bit < 8; bit++)
                 {
-                    *fpsBuffer++ = fpsfgcolor;
+                    if (fontSlice & 1)
+                    {
+                        *fpsBuffer++ = fpsfgcolor;
+                    }
+                    else
+                    {
+                        *fpsBuffer++ = fpsbgcolor;
+                    }
+                    fontSlice >>= 1;
                 }
-                else
-                {
-                    *fpsBuffer++ = fpsbgcolor;
-                }
-                fontSlice >>= 1;
             }
         }
+    }
+    else
+    {
+        memset(buffer, 0, screenWidth * 2);
     }
     //  for (int kol = 0; kol < screenWidth; kol ++)
     // {
@@ -508,6 +522,16 @@ void __time_critical_func(emulate)()
             Frens::markFrameReadyForReendering();
         }
         ProcessAfterFrameIsRendered();
+        if (palette444 == palette444_1)
+        {
+            palette444 = palette444_2;
+            memcpy(palette444_2, palette444_1, sizeof(palette444_1));
+        }
+        else
+        {
+            palette444 = palette444_1;
+            memcpy(palette444_1, palette444_2, sizeof(palette444_2));
+        }
         frame++;
         if (limit_fps)
         {
@@ -545,6 +569,7 @@ void __time_critical_func(emulate)()
 
     reboot = false;
 }
+
 /// @brief
 /// Start emulator.
 /// @return
@@ -564,7 +589,7 @@ int main()
 
     stdio_init_all();
     sleep_ms(500);
-    printf("Starting Genesis System Emulator\n");
+    printf("Starting Genesis Emulator\n");
     printf("CPU freq: %d\n", clock_get_hz(clk_sys));
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
@@ -601,6 +626,10 @@ int main()
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
 #endif
         Frens::SetFrameBufferProcessScanLineFunction(processEmulatorScanLine);
+        memset(palette444_1, 0, sizeof(palette444_1));
+        memset(palette444_2, 0, sizeof(palette444_2));
+        palette444 = palette444_1;
+        palette444[255] = 0; // black
 
         // Todo: Initialize emulator
         printf("Starting game\n");
