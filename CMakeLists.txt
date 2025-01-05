@@ -173,7 +173,8 @@ target_compile_definitions(${projectname} PUBLIC
     NES_PIO_1=${NES_PIO_1}
     WII_PIN_SDA=${WII_SDA}
     WII_PIN_SCL=${WII_SCL}
-    LED_GPIO_PIN=${LED_GPIO_PIN})
+    LED_GPIO_PIN=${LED_GPIO_PIN}
+    CPUKFREQKHZ=266000 )
     
 target_link_libraries(${projectname}
 PRIVATE
