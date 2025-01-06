@@ -56,9 +56,36 @@ bool reset = false;
 bool reboot = false;
 
 extern unsigned short button_state[3];
-uint16_t __scratch_y("gen_palette1") palette444_1[256];
-uint16_t __scratch_y("gen_palette2") palette444_2[256];
+uint16_t __scratch_y("gen_palette1") palette444_1[64];
+uint16_t __scratch_y("gen_palette2") palette444_2[64];
 uint16_t *palette444 = palette444_1;
+
+/* Clocks and synchronization */
+/* system clock is video clock */
+int system_clock;
+unsigned int lines_per_frame = LINES_PER_FRAME_NTSC; // 262; /* NTSC: 262, PAL: 313 */
+int scan_line;
+unsigned int frame_counter = 0;
+unsigned int drawFrame = 1;
+int z80_enable_mode = 2;
+bool interlace = true; // was true
+int frame = 0;
+int frame_cnt = 0;
+int frame_timer_start = 0;
+bool limit_fps = false; // was true
+bool frameskip = false; // was true
+int audio_enabled = 0;
+bool sn76489_enabled = true;
+uint8_t snd_accurate = 0;
+
+extern unsigned char gwenesis_vdp_regs[0x20];
+extern unsigned int gwenesis_vdp_status;
+extern unsigned int screen_width, screen_height;
+extern int hint_pending;
+
+int sn76489_index; /* sn78649 audio buffer index */
+int sn76489_clock;
+
 #ifndef CPUKFREQKHZ
 #define CPUKFREQKHZ 252000
 #endif
@@ -266,17 +293,31 @@ extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
     palette444[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
 }
 uint8_t maxkol = 0;
-void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_line, uint16_t *buffer, int screenWidth)
+void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_line, uint16_t *buffer, int physical_screenWidth)
 {
     if (line < 224)
     {
-        for (int kol = 0; kol < screenWidth; kol += 4)
+        int srcIndex=0;
+        // screen_width is resolution from the emulator
+        if (screen_width < physical_screenWidth)
         {
+            memset(buffer, 0, 32 * 2);
+        }
+        for (int kol = (screen_width == physical_screenWidth ? 0 : 32); kol < physical_screenWidth; kol += 4)
+        {
+            if ( kol < screen_width + 32) {
+                buffer[kol] = palette444[current_line[srcIndex] & 0x3f];
+                buffer[kol + 1] = palette444[current_line[srcIndex + 1] & 0x3f];
+                buffer[kol + 2] = palette444[current_line[srcIndex + 2] & 0x3f];
+                buffer[kol + 3] = palette444[current_line[srcIndex + 3] & 0x3f];
+            } else {
+                buffer[kol] = 0;
+                buffer[kol + 1] = 0;
+                buffer[kol + 2] = 0;
+                buffer[kol + 3] = 0;
+            }
 
-            buffer[kol] = palette444[current_line[kol] & 0x3f];
-            buffer[kol + 1] = palette444[current_line[kol + 1] & 0x3f];
-            buffer[kol + 2] = palette444[current_line[kol + 2] & 0x3f];
-            buffer[kol + 3] = palette444[current_line[kol + 3] & 0x3f];
+            srcIndex += 4;
         }
 
         if (fps_enabled && line >= FPSSTART && line < FPSEND)
@@ -304,34 +345,10 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_lin
     }
     else
     {
-        memset(buffer, 0, screenWidth * 2);
+        memset(buffer, 0, physical_screenWidth * 2);
     }
 }
-/* Clocks and synchronization */
-/* system clock is video clock */
-int system_clock;
-unsigned int lines_per_frame = LINES_PER_FRAME_NTSC; // 262; /* NTSC: 262, PAL: 313 */
-int scan_line;
-unsigned int frame_counter = 0;
-unsigned int drawFrame = 1;
-int z80_enable_mode = 2;
-bool interlace = true; // was true
-int frame = 0;
-int frame_cnt = 0;
-int frame_timer_start = 0;
-bool limit_fps = false; // was true
-bool frameskip = false; // was true
-int audio_enabled = 0;
-bool sn76489_enabled = true;
-uint8_t snd_accurate = 0;
 
-extern unsigned char gwenesis_vdp_regs[0x20];
-extern unsigned int gwenesis_vdp_status;
-extern unsigned int screen_width, screen_height;
-extern int hint_pending;
-
-int sn76489_index; /* sn78649 audio buffer index */
-int sn76489_clock;
 void __not_in_flash_func(emulate)()
 {
 
