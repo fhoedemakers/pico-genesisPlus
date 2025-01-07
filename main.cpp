@@ -72,7 +72,7 @@ bool interlace = true; // was true
 int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
-bool limit_fps = false; // was true
+bool limit_fps = true;  // was true
 bool frameskip = false; // was true
 int audio_enabled = 0;
 bool sn76489_enabled = true;
@@ -148,19 +148,8 @@ int ProcessAfterFrameIsRendered()
 #if NES_PIN_CLK != -1
     nespad_read_finish(); // Sets global nespad_state var
 #endif
-    // nespad_read_finish(); // Sets global nespad_state var
     tuh_task();
-    // Frame rate calculation
-    if (fps_enabled)
-    {
-        // calculate fps and round to nearest value (instead of truncating/floor)
-        uint64_t tick_us = Frens::time_us() - start_tick_us;
-        fps = (1000000 - 1) / tick_us + 1;
-        start_tick_us = Frens::time_us();
-        fpsString[0] = '0' + (fps / 100) % 10;
-        fpsString[1] = '0' + (fps / 10) % 10;
-        fpsString[2] = '0' + (fps % 10);
-    }
+
     return count;
 }
 
@@ -297,7 +286,7 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_lin
 {
     if (line < 224)
     {
-        int srcIndex=0;
+        int srcIndex = 0;
         // screen_width is resolution from the emulator
         if (screen_width < physical_screenWidth)
         {
@@ -305,12 +294,15 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_lin
         }
         for (int kol = (screen_width == physical_screenWidth ? 0 : 32); kol < physical_screenWidth; kol += 4)
         {
-            if ( kol < screen_width + 32) {
+            if (kol < screen_width + 32)
+            {
                 buffer[kol] = palette444[current_line[srcIndex] & 0x3f];
                 buffer[kol + 1] = palette444[current_line[srcIndex + 1] & 0x3f];
                 buffer[kol + 2] = palette444[current_line[srcIndex + 2] & 0x3f];
                 buffer[kol + 3] = palette444[current_line[srcIndex + 3] & 0x3f];
-            } else {
+            }
+            else
+            {
                 buffer[kol] = 0;
                 buffer[kol + 1] = 0;
                 buffer[kol + 2] = 0;
@@ -354,6 +346,9 @@ void __not_in_flash_func(emulate)()
 
     // FH gwenesis_vdp_set_buffer((uint8_t *)SCREEN);
     uint8_t tmpbuffer[SCREENWIDTH];
+    bool firstLoop = true;
+    unsigned int old_screen_width = 0;
+    unsigned int old_screen_height = 0;
     while (!reboot)
     {
         /* Eumulator loop */
@@ -364,9 +359,12 @@ void __not_in_flash_func(emulate)()
         screen_height = is_pal ? 240 : 224;
         lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
         // Printf values
-#if 0
-        printf("frame %d, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", frame, is_pal, screen_width, screen_height, lines_per_frame);
-#endif
+        if ( firstLoop || old_screen_height != screen_height || old_screen_width != screen_width) {
+            printf("is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", is_pal, screen_width, screen_height, lines_per_frame);
+            firstLoop = false;
+            old_screen_height = screen_height;
+            old_screen_width = screen_width;
+        }
         // graphics_set_buffer(buffer, screen_width, screen_height);
         // TODO: move to separate function graphics_set_dimensions ?
         // FH graphics_set_buffer((uint8_t*)SCREEN, screen_width, screen_height);
@@ -475,12 +473,18 @@ void __not_in_flash_func(emulate)()
             frame_cnt++;
             if (frame_cnt == (is_pal ? 5 : 6))
             {
+                // int cnt = 0;
                 while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6))
                 {
                     busy_wait_at_least_cycles(10);
+                    // cnt++;
                 }; // 60 Hz
                 frame_timer_start = time_us_64();
                 frame_cnt = 0;
+                // if (cnt > 1)
+                // {
+                //     printf("cnt: %d\n", cnt);
+                // }
             }
         }
 
@@ -502,6 +506,33 @@ void __not_in_flash_func(emulate)()
 
         /* copy audio samples for DMA */
         // gwenesis_sound_submit();
+
+        // Frame rate calculation
+        // if (fps_enabled)
+        // {
+        //     // calculate fps and round to nearest value (instead of truncating/floor)
+        //     uint64_t tick_us = Frens::time_us() - start_tick_us;
+        //     fps = (1000000 - 1) / tick_us + 1;
+        //     start_tick_us = Frens::time_us();
+        //     fpsString[0] = '0' + (fps / 100) % 10;
+        //     fpsString[1] = '0' + (fps / 10) % 10;
+        //     fpsString[2] = '0' + (fps % 10);
+        // }
+        // calculate framerate based on the frame cumulative counter
+        if (fps_enabled)
+        {
+            uint64_t tick_us = Frens::time_us() - start_tick_us;
+            if (tick_us > 1000000)
+            {
+                fps = frame_counter;
+                start_tick_us = Frens::time_us();
+                frame_counter = 0;
+            }
+            fpsString[0] = '0' + (fps / 100) % 10;
+            fpsString[1] = '0' + (fps / 10) % 10;
+            fpsString[2] = '0' + (fps % 10);
+            frame_counter++;
+        }
     }
 
     reboot = false;
