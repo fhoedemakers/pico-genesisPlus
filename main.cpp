@@ -74,7 +74,7 @@ int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = true;  // was true
 bool frameskip = false; // was true
-int audio_enabled = 0;
+int audio_enabled = 1;
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 0;
 
