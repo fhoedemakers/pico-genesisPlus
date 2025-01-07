@@ -282,31 +282,32 @@ extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
     palette444[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
 }
 uint8_t maxkol = 0;
-void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_line, uint16_t *buffer, int physical_screenWidth)
+void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer, uint16_t *dvibuffer)
 {
     if (line < 224)
     {
+        auto current_line = &framebuffer[line * SCREENWIDTH];
         int srcIndex = 0;
         // screen_width is resolution from the emulator
-        if (screen_width < physical_screenWidth)
+        if (screen_width < SCREENWIDTH)
         {
-            memset(buffer, 0, 32 * 2);
+            memset(dvibuffer, 0, 32 * 2);
         }
-        for (int kol = (screen_width == physical_screenWidth ? 0 : 32); kol < physical_screenWidth; kol += 4)
+        for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
         {
             if (kol < screen_width + 32)
             {
-                buffer[kol] = palette444[current_line[srcIndex] & 0x3f];
-                buffer[kol + 1] = palette444[current_line[srcIndex + 1] & 0x3f];
-                buffer[kol + 2] = palette444[current_line[srcIndex + 2] & 0x3f];
-                buffer[kol + 3] = palette444[current_line[srcIndex + 3] & 0x3f];
+                dvibuffer[kol] = palette444[current_line[srcIndex] & 0x3f];
+                dvibuffer[kol + 1] = palette444[current_line[srcIndex + 1] & 0x3f];
+                dvibuffer[kol + 2] = palette444[current_line[srcIndex + 2] & 0x3f];
+                dvibuffer[kol + 3] = palette444[current_line[srcIndex + 3] & 0x3f];
             }
             else
             {
-                buffer[kol] = 0;
-                buffer[kol + 1] = 0;
-                buffer[kol + 2] = 0;
-                buffer[kol + 3] = 0;
+                dvibuffer[kol] = 0;
+                dvibuffer[kol + 1] = 0;
+                dvibuffer[kol + 2] = 0;
+                dvibuffer[kol + 3] = 0;
             }
 
             srcIndex += 4;
@@ -314,7 +315,7 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_lin
 
         if (fps_enabled && line >= FPSSTART && line < FPSEND)
         {
-            WORD *fpsBuffer = buffer + 5;
+            WORD *fpsBuffer = dvibuffer + 5;
             int rowInChar = line % 8;
             for (auto i = 0; i < 3; i++)
             {
@@ -337,7 +338,7 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *current_lin
     }
     else
     {
-        memset(buffer, 0, physical_screenWidth * 2);
+         memset(dvibuffer, 0, SCREENWIDTH * 2);
     }
 }
 
@@ -563,8 +564,8 @@ int main()
         }
 #endif
         scaleMode8_7_ = Frens::applyScreenMode(ScreenMode::MAX);
-        dvi_->getBlankSettings().top = 0;
-        dvi_->getBlankSettings().bottom = 0;
+        // dvi_->getBlankSettings().top = 0;
+        // dvi_->getBlankSettings().bottom = 0;
         reset = false;
 #if 0
         FRESULT fr;
