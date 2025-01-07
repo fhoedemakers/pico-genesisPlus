@@ -507,18 +507,7 @@ void __not_in_flash_func(emulate)()
         /* copy audio samples for DMA */
         // gwenesis_sound_submit();
 
-        // Frame rate calculation
-        // if (fps_enabled)
-        // {
-        //     // calculate fps and round to nearest value (instead of truncating/floor)
-        //     uint64_t tick_us = Frens::time_us() - start_tick_us;
-        //     fps = (1000000 - 1) / tick_us + 1;
-        //     start_tick_us = Frens::time_us();
-        //     fpsString[0] = '0' + (fps / 100) % 10;
-        //     fpsString[1] = '0' + (fps / 10) % 10;
-        //     fpsString[2] = '0' + (fps % 10);
-        // }
-        // calculate framerate based on the frame cumulative counter
+        // calculate framerate
         if (fps_enabled)
         {
             uint64_t tick_us = Frens::time_us() - start_tick_us;
