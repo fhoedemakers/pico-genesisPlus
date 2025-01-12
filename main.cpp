@@ -617,7 +617,6 @@ int main()
         memset(palette444_1, 0, sizeof(palette444_1));
         memset(palette444_2, 0, sizeof(palette444_2));
         palette444 = palette444_1;
-        // Todo: Initialize emulator
         printf("Starting game\n");
         init_emulator_mem();
         load_cartridge(ROM_FILE_ADDR); // 0x100d2000); // 0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
