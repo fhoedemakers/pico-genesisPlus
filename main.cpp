@@ -74,7 +74,7 @@ int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = true;  // was true
 bool frameskip = false; // was true
-int audio_enabled = 1;
+int audio_enabled = 0;
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 0;
 
@@ -96,45 +96,50 @@ namespace
 }
 
 int sampleIndex = 0;
-void __not_in_flash_func(processaudio)(int offset)
+void __not_in_flash_func(processaudio)(int line)
 {
-    int samples = 4; // 735/192 = 3.828125 192*4=768 735/3=245
+    constexpr int samplesPerLine = ((GWENESIS_AUDIO_BUFFER_LENGTH_NTSC + SCREENHEIGHT - 1) / SCREENHEIGHT); // 735/192 = 3.828125 192*4=768 735/3=245
+    if (line == 0)
+    {
+        sampleIndex = 0;
+    }
+    if (sampleIndex >= (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC << 1))
+    {
+        return;
+    }
+    // rounded up sample rate per scanline
+    int samples = samplesPerLine;
+    // printf("line %d, SampleIndex: %d, Samples: %d\n", line,  sampleIndex    , samples);
+    // short *p1 = gwenesis_sn76489_buffer + sampleIndex; // snd.buffer[0] + sampleIndex;
+    // short *p2 = gwenesis_sn76489_buffer + sampleIndex + 1; // snd.buffer[1] + sampleIndex;
 
-    // if (offset == (IS_GG ? 24 : 0))
-    // {
-    //     sampleIndex = 0;
-    // }
-    // else
-    // {
-    //     sampleIndex += samples;
-    //     if (sampleIndex >= 735)
-    //     {
-    //         return;
-    //     }
-    // }
-    // short *p1 = snd.buffer[0] + sampleIndex;
-    // short *p2 = snd.buffer[1] + sampleIndex;
-    // while (samples)
-    // {
-    //     auto &ring = dvi_->getAudioRingBuffer();
-    //     auto n = std::min<int>(samples, ring.getWritableSize());
-    //     if (!n)
-    //     {
-    //         return;
-    //     }
-    //     auto p = ring.getWritePointer();
-    //     int ct = n;
-    //     while (ct--)
-    //     {
-    //         int l = (*p1++ << 16) + *p2++;
-    //         // works also : int l = (*p1++ + *p2++) / 2;
-    //         int r = l;
-    //         // int l = *wave1++;
-    //         *p++ = {static_cast<short>(l), static_cast<short>(r)};
-    //     }
-    //     ring.advanceWritePointer(n);
-    //     samples -= n;
-    // }
+    //  = (gwenesis_sn76489_buffer[sampleIndex / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+    while (samples)
+    {
+        auto &ring = dvi_->getAudioRingBuffer();
+        auto n = std::min<int>(samples, ring.getWritableSize());
+        // printf("\tSamples: %d, n: %d,\n", samples, n);
+        if (!n)
+        {
+            // printf("Line %d, Audio buffer overrun\n", line);
+            return;
+        }
+        auto p = ring.getWritePointer();
+        int ct = n;
+        // printf("\tSamples: %d, n: %d, ct: %d\n", samples, n, ct);
+        while (ct--)
+        {
+            int l = gwenesis_sn76489_buffer[sampleIndex / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR];
+            int r = gwenesis_sn76489_buffer[(sampleIndex + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR];
+            // p1 += 2;
+            // p2 += 2;
+            *p++ = {static_cast<short>(l), static_cast<short>(r)};
+            sampleIndex += 2;
+            // printf("\tSamples: %d, n: %d, ct: %d\n", samples, n, ct);
+        }
+        ring.advanceWritePointer(n);
+        samples -= n;
+    }
 }
 
 int ProcessAfterFrameIsRendered()
@@ -169,6 +174,19 @@ static constexpr int A = 1 << 0;
 static constexpr int B = 1 << 1;
 static constexpr int C = 1 << 8;
 
+void toggleScreenMode()
+{
+    if (settings.screenMode == ScreenMode::SCANLINE_1_1)
+    {
+        settings.screenMode = ScreenMode::NOSCANLINE_1_1;
+    }
+    else
+    {
+        settings.screenMode = ScreenMode::SCANLINE_1_1;
+    }
+    Frens::savesettings();
+    Frens::applyScreenMode(settings.screenMode);
+}
 void gwenesis_io_get_buttons()
 {
     bool usbConnected = false;
@@ -250,11 +268,11 @@ void gwenesis_io_get_buttons()
             }
             if (pushed & UP)
             {
-                Frens::screenMode(-1);
+                toggleScreenMode();
             }
             else if (pushed & DOWN)
             {
-                Frens::screenMode(+1);
+                toggleScreenMode();
             }
         }
         sizeof(unsigned short);
@@ -284,6 +302,7 @@ extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
 uint8_t maxkol = 0;
 void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer, uint16_t *dvibuffer)
 {
+    // processaudio(line);
     if (line < 224)
     {
         auto current_line = &framebuffer[line * SCREENWIDTH];
@@ -338,7 +357,7 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer
     }
     else
     {
-         memset(dvibuffer, 0, SCREENWIDTH * 2);
+        memset(dvibuffer, 0, SCREENWIDTH * 2);
     }
 }
 
@@ -360,16 +379,14 @@ void __not_in_flash_func(emulate)()
         screen_height = is_pal ? 240 : 224;
         lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
         // Printf values
-        if ( firstLoop || old_screen_height != screen_height || old_screen_width != screen_width) {
+        if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
+        {
             printf("is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", is_pal, screen_width, screen_height, lines_per_frame);
             firstLoop = false;
             old_screen_height = screen_height;
             old_screen_width = screen_width;
         }
-        // graphics_set_buffer(buffer, screen_width, screen_height);
-        // TODO: move to separate function graphics_set_dimensions ?
-        // FH graphics_set_buffer((uint8_t*)SCREEN, screen_width, screen_height);
-        // FH graphics_set_offset(screen_width != 320 ? 32 : 0, screen_height != 240 ? 8 : 0);
+
         gwenesis_vdp_render_config();
 
         zclk = 0;
@@ -383,6 +400,10 @@ void __not_in_flash_func(emulate)()
 
         while (scan_line < lines_per_frame)
         {
+            if (audio_enabled)
+            {
+                processaudio(scan_line);
+            }
             // printf("%d\n", scan_line);
 
             uint8_t *frameline_buffer = tmpbuffer;
@@ -533,12 +554,16 @@ void __not_in_flash_func(emulate)()
 /// @return
 int main()
 {
+#if !defined(PICO_RP2350)
+#error "This code is for RP2350 only"
+#endif
     char selectedRom[FF_MAX_LFN];
     romName = selectedRom;
     ErrorMessage[0] = selectedRom[0] = 0;
 
     int fileSize = 0;
     bool isGameGear = false;
+    // Generate a build error if RP2040
 
     // Set voltage and clock frequency
     vreg_set_voltage(VREG_VOLTAGE_1_20);
@@ -552,7 +577,7 @@ int main()
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
 
-    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 256, true, true);
+    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 10240, true, true);
     bool showSplash = true;
 
     while (true)
@@ -563,7 +588,12 @@ int main()
             menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
         }
 #endif
-        scaleMode8_7_ = Frens::applyScreenMode(ScreenMode::MAX);
+        if (settings.screenMode != ScreenMode::SCANLINE_1_1 && settings.screenMode != ScreenMode::NOSCANLINE_1_1)
+        {
+            settings.screenMode = ScreenMode::SCANLINE_1_1;
+            Frens::savesettings();
+        }
+        scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
         // dvi_->getBlankSettings().top = 0;
         // dvi_->getBlankSettings().bottom = 0;
         reset = false;
