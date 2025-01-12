@@ -357,7 +357,7 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer
     }
     else
     {
-        memset(dvibuffer, 0, SCREENWIDTH * 2);
+        // memset(dvibuffer, 0, SCREENWIDTH * 2);
     }
 }
 
@@ -594,8 +594,8 @@ int main()
             Frens::savesettings();
         }
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
-        // dvi_->getBlankSettings().top = 0;
-        // dvi_->getBlankSettings().bottom = 0;
+        dvi_->getBlankSettings().top = 8 * 2;
+        dvi_->getBlankSettings().bottom = 8 * 2;
         reset = false;
 #if 0
         FRESULT fr;
