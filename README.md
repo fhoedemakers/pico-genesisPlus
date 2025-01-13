@@ -6,7 +6,8 @@ Sound currently nog working. Help wanted.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis)
 
-Due to the flash size of the Raspberry Pi pico 2, 4MB roms cannot be loaded. Also not every game is guaranteed to work.
+Due to the flash size of the Raspberry Pi pico 2, 4MB roms cannot be loaded. The menu will not show roms too large for the Pico 2.
+Also not every game is guaranteed to work.
 
 ## Setup
 
