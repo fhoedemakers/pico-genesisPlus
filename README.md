@@ -1,4 +1,4 @@
-# Pico Genesis Plus
+# Pico-genesisPlus
 
 A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (0RP2350). Loads roms from SD-card, uses hdmi for display.
 
