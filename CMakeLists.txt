@@ -175,7 +175,8 @@ target_compile_definitions(${projectname} PUBLIC
     WII_PIN_SCL=${WII_SCL}
     LED_GPIO_PIN=${LED_GPIO_PIN}
     CPUKFREQKHZ=340000
-    DVIAUDIOFREQ=53267 )
+    DVIAUDIOFREQ=53267
+    ABSWAPPED=0 )
     
 target_link_libraries(${projectname}
 PRIVATE
