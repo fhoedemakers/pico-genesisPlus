@@ -24,6 +24,6 @@ For the latest two player PCB 2.0, you need:
 
 ## Features
 
-- Initial pre-release. Sound not working yet. Help wanted.
+- Initial pre-release. Sound not working yet. Help wanted. Not all is tested yet.
 
 ## Fixes
