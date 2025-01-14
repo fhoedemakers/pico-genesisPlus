@@ -613,6 +613,7 @@ int main()
 
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
 #endif
+        abSwapped = 0; // don't swap A and B buttons
         Frens::SetFrameBufferProcessScanLineFunction(processEmulatorScanLine);
         memset(palette444_1, 0, sizeof(palette444_1));
         memset(palette444_2, 0, sizeof(palette444_2));
