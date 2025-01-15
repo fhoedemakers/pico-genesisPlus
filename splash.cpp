@@ -25,6 +25,9 @@ void splash()
     strcpy(s, "emulator for RP2350");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 5, s, fgcolorSplash, bgcolorSplash);
    
+    strcpy(s, "Based on github.com/bzhxx/gwenesis");
+    putText(SCREEN_COLS / 2 - strlen(s) / 2, 7, s, fgcolorSplash, bgcolorSplash);
+
     strcpy(s, "Pico Port");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 9, s, fgcolorSplash, bgcolorSplash);
     strcpy(s, "@frenskefrens");
