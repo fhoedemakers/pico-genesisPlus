@@ -29,7 +29,7 @@ Raspberry Pi Pico 2 arm-s is the only supported config.  Builds for Risc-v curre
 Building for breadboard and PCB configurations. 
 
 ````bash
-git clone
+git clone https://github.com/fhoedemakers/pico-genesisPlus.git
 cd pico-genesisPlus
 git submodule update --init
 ./bld.sh -c2 -2
@@ -38,7 +38,7 @@ git submodule update --init
 Building for the Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291)
 
 ````bash
-git clone
+git clone https://github.com/fhoedemakers/pico-genesisPlus.git
 cd pico-genesisPlus
 git submodule update --init
 ./bld.sh -c1 -2
