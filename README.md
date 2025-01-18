@@ -13,6 +13,15 @@ Also not every game is guaranteed to work.
 
 [The emulator is based on Pico-InfonesPlus. Please refer to that repository for how to setup.](https://github.com/fhoedemakers/pico-infonesPlus)
 
+
+## Supported controllers and in-game button mapping
+
+- Dual Shock/Dual Sense and PSClassic: Cross: A, Circle: B, Triangle: C
+- Xbox style controllers (XInput): A: A, B: B, Y: C
+- Vintage NES controller: B: A, A: B, Select: C
+- ALiExpress SNES USB controller: B: A, A: B, X: C
+- Genesis Mini
+
 ## Building from source
 
 Raspberry Pi Pico 2 arm-s is the only supported config.  Builds for Risc-v currently do not work.
