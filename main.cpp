@@ -87,7 +87,7 @@ int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 
 #ifndef CPUKFREQKHZ
-#define CPUKFREQKHZ 252000
+#define CPUKFREQKHZ 340000
 #endif
 namespace
 {
