@@ -19,7 +19,8 @@ Also not every game is guaranteed to work.
 - Dual Shock/Dual Sense and PSClassic: Cross: A, Circle: B, Triangle: C
 - Xbox style controllers (XInput): A: A, B: B, Y: C
 - Vintage NES controller: B: A, A: B, Select: C
-- ALiExpress SNES USB controller: B: A, A: B, X: C
+- ALiExpress SNES USB controller: B: B, A: A, X,Select: C (You need to press Y on this controller to enable the X-button) 
+- AliExpres NES USB controller: B: B, A: A, Select: C
 - Genesis Mini
 
 ## Building from source
