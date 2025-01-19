@@ -4,7 +4,7 @@ set(projectname picogenesisPlus)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-
+set(PICO_BOARD pico2)
 IF(NOT CMAKE_BUILD_TYPE)
    SET(CMAKE_BUILD_TYPE Debug
        CACHE STRING "Choose the type of build : None Debug Release RelWithDebInfo MinSizeRel."
@@ -175,8 +175,7 @@ target_compile_definitions(${projectname} PUBLIC
     WII_PIN_SCL=${WII_SCL}
     LED_GPIO_PIN=${LED_GPIO_PIN}
     CPUKFREQKHZ=340000
-    DVIAUDIOFREQ=53267
-    ABSWAPPED=0 )
+    DVIAUDIOFREQ=53267)
     
 target_link_libraries(${projectname}
 PRIVATE

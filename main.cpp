@@ -585,7 +585,7 @@ int main()
 #if 1
         if (strlen(selectedRom) == 0 || reset == true)
         {
-            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md"); // never returns, but reboots upon selecting a game
+            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md, .bin"); // never returns, but reboots upon selecting a game
         }
 #endif
         if (settings.screenMode != ScreenMode::SCANLINE_1_1 && settings.screenMode != ScreenMode::NOSCANLINE_1_1)
@@ -613,6 +613,7 @@ int main()
 
         printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
 #endif
+        abSwapped = 0; // don't swap A and B buttons
         Frens::SetFrameBufferProcessScanLineFunction(processEmulatorScanLine);
         memset(palette444_1, 0, sizeof(palette444_1));
         memset(palette444_2, 0, sizeof(palette444_2));
