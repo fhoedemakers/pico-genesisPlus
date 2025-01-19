@@ -26,14 +26,8 @@ For the latest two player PCB 2.0, you need:
 
 - Enabled support for additional controllers. See README for details.
 
+Sound still not working. Help wanted for this. Not all is tested.
+
 ## Fixes
 
 - Various minor fixes and improvements.
-
-# v0.1 release notes
-
-## Features
-
-- Initial pre-release. Sound not working yet. Help wanted. Not all is tested yet.
-
-## Fixes
