@@ -26,6 +26,10 @@ For the latest two player PCB 2.0, you need:
 
 - Enabled support for additional controllers. See README for details.
 
+## Fixes
+
+- Various minor fixes and improvements.
+
 # v0.1 release notes
 
 ## Features
