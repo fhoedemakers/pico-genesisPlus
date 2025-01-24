@@ -578,8 +578,6 @@ int main()
     ErrorMessage[0] = selectedRom[0] = 0;
 
     int fileSize = 0;
-    bool isGameGear = false;
-    // Generate a build error if RP2040
 
     // Set voltage and clock frequency
     vreg_set_voltage(VREG_VOLTAGE_1_20);
