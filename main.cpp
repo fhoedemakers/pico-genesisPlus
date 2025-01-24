@@ -86,8 +86,21 @@ extern int hint_pending;
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 
+// Overclock tests:
+// 252000 OK
+// 266000 OK
+// 280000 OK
+// 294000 OK
+// 308000 OK
+// 322000 Panic System clock of %u kHz cannot be exactly achieved 
+// 324000 OK
+// 325000 Panic System clock of %u kHz cannot be exactly achieved
+// 326000 Panic System clock of %u kHz cannot be exactly achieved
+// 328000 Not supported signal on samsung tv
+// 330000 Not supported signal on samsung tv
+// 340000 Not supported signal on samsung tv
 #ifndef CPUKFREQKHZ
-#define CPUKFREQKHZ 340000
+#define CPUKFREQKHZ  324000 
 #endif
 namespace
 {
@@ -260,12 +273,7 @@ void gwenesis_io_get_buttons()
                 reboot = true;
                 printf("Reset pressed\n");
             }
-            // Toggle frame rate display
-            if (pushed & A)
-            {
-                fps_enabled = !fps_enabled;
-                printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
-            }
+           
             if (pushed & UP)
             {
                 toggleScreenMode();
@@ -273,6 +281,14 @@ void gwenesis_io_get_buttons()
             else if (pushed & DOWN)
             {
                 toggleScreenMode();
+            }
+        }
+        if ( p1 & START) {
+             // Toggle frame rate display
+            if (pushed & A)
+            {
+                fps_enabled = !fps_enabled;
+                printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
             }
         }
         sizeof(unsigned short);
