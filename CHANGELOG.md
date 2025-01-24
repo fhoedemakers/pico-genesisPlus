@@ -20,14 +20,15 @@ For the latest two player PCB 2.0, you need:
 
 3D-printed case design for Waveshare RP2040-PiZero: [https://www.thingiverse.com/thing:6758682](https://www.thingiverse.com/thing:6758682)
 
-# v0.2 release notes
+# v0.3 release notes
 
 ## Features
 
-- Enabled support for additional controllers. See README for details.
-
-Sound still not working. Help wanted for this. Not all is tested.
+- Disabled framerate display by default. Can be toggled with START + A.
 
 ## Fixes
 
-- Various minor fixes and improvements.
+- lowered overclock speed from 340000 Khz to 324000 Khz. This should fix the issue with the screen not displaying on some televisions. (Did not notice this, because i was using a capture card for testing. which does not have this issue)
+ Be aware that there are still displays that cannot display the image.
+
+Sound still not working. Help wanted for this. Not all is tested.
