@@ -39,7 +39,7 @@ bool isFatalError = false;
 static FATFS fs;
 char *romName;
 
-static bool fps_enabled = true;
+static bool fps_enabled = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
