@@ -20,11 +20,12 @@ For the latest two player PCB 2.0, you need:
 
 3D-printed case design for Waveshare RP2040-PiZero: [https://www.thingiverse.com/thing:6758682](https://www.thingiverse.com/thing:6758682)
 
-# v0.3 release notes
+# v0.4 release notes
 
 ## Features
 
 - Disabled framerate display by default. Can be toggled with START + A.
+- Start + DPAD UP: Toggle scanlines. (changes are saved to config file)
 
 ## Fixes
 
