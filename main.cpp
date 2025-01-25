@@ -592,7 +592,7 @@ int main()
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
 
-    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 10240, true, true);
+    isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, 16384, true, true);
     bool showSplash = true;
 
     while (true)
