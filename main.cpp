@@ -274,14 +274,7 @@ void gwenesis_io_get_buttons()
                 printf("Reset pressed\n");
             }
            
-            if (pushed & UP)
-            {
-                toggleScreenMode();
-            }
-            else if (pushed & DOWN)
-            {
-                toggleScreenMode();
-            }
+           
         }
         if ( p1 & START) {
              // Toggle frame rate display
@@ -290,6 +283,14 @@ void gwenesis_io_get_buttons()
                 fps_enabled = !fps_enabled;
                 printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
             }
+            if (pushed & UP)
+            {
+                toggleScreenMode();
+            }
+            // else if (pushed & DOWN)
+            // {
+            //     toggleScreenMode();
+            // }
         }
         sizeof(unsigned short);
         prevButtons[i] = v;
