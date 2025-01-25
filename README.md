@@ -24,7 +24,24 @@ Also not every game is guaranteed to work.
 - Vintage NES controller: B: A, A: B, Select: C
 - ALiExpress SNES USB controller: B: A, A: B, X/Select: C (For this to work, you need to press Y on this controller every time you start a game or boot into the menu) 
 - AliExpres NES USB controller: B: B, A: A, Select: C
-- Genesis Mini
+- Genesis Mini 1 and 2 
+
+To go back to the menu press Select + Start. Genesis mini controller C + Start.
+Start + A toggles the framerate display.
+
+
+In menu:
+- D-Pad: Move selection.
+- B: Select folder or flash and start rom.
+- A: Go back.
+- Start: load previous flashed rom.
+- Select + dpad up/down change foreground color.
+- Select + dpad left/right background color.
+- Select + B: Saves background and foreground color to config file.
+- Select + A resets background and foreground color to default.
+
+When using Genesis Mini controller, the C button is used for select.
+
 
 ## Building from source
 

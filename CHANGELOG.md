@@ -7,7 +7,7 @@ Binaries for each configuration and PCB design are at the end of this page. 4MB 
 Only RP2350 supported.
 
 
-[See setup section in readme how to install and wire up](https://github.com/fhoedemakers/pico-infonesPlus#pico-setup)
+[See setup section in the readme of the pico-infonesPlus repo on how to install and wire up](https://github.com/fhoedemakers/pico-infonesPlus#pico-setup)
 
 3D-printed case design for PCB: [https://www.thingiverse.com/thing:6689537](https://www.thingiverse.com/thing:6689537). 
 For the latest two player PCB 2.0, you need:
