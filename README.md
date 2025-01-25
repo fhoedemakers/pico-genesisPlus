@@ -28,6 +28,7 @@ Also not every game is guaranteed to work.
 
 To go back to the menu press Select + Start. Genesis mini controller C + Start.
 Start + A toggles the framerate display.
+Start + Dpad up toggles scanlines.
 
 
 In menu:
