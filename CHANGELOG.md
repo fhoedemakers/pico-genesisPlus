@@ -29,7 +29,7 @@ For the latest two player PCB 2.0, you need:
 
 ## Fixes
 
-- lowered overclock speed from 340000 Khz to 324000 Khz. This should fix the issue with the screen not displaying on some televisions. (Did not notice this, because i was using a capture card for testing. which does not have this issue)
+- lowered overclock speed from 340000 Khz to 324000 Khz. This should fix the issue with the screen not displaying on some televisions. (Did not notice this, because i was using a capture card for testing, which does not have this issue)
  Be aware that there are still displays that cannot display the image.
 
 Sound still not working. Help wanted for this. Not all is tested.
