@@ -24,11 +24,16 @@ fi
 # 	./bld.sh -c $HWCONFIG
 # done
 # build for Pico 2 arm and risc-v
-HWCONFIGS="1 2"
+HWCONFIGS="1 2 5"
 for HWCONFIG in $HWCONFIGS
 do
 	./bld.sh -c $HWCONFIG -2
-	#./bld.sh -c $HWCONFIG -r
+	./bld.sh -c $HWCONFIG -2 -w
+	# No build for Adafruit Metro RP2350 because sdcard driver not working in this config
+	if [ $HWCONFIG -ne 5 ]; then
+		./bld.sh -c $HWCONFIG -r
+		./bld.sh -c $HWCONFIG -r -w
+	fi
 done
 if [ -z "$(ls -A releases)" ]; then
 	echo "No UF2 files found in releases folder"
