@@ -35,7 +35,7 @@ For the latest two player PCB 2.0, you need:
 - WII classic controller: i2c bus instance (i2c0 / i2c1) not hardcoded anymore but configurable via CMakeLists.txt. 
 
 > [!NOTE]
-It is possible that some displays may display no image because of the high ckickspeed settings.
+It is possible that some displays may display no image because of the high clockspeed settings.
 
 All changes are in the pico_shared submodule. When building from source, make sure you do a **git submodule update --init** from within the source folder to get the latest pico_shared module.
 
