@@ -69,7 +69,7 @@ int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = false;  // was true
 bool frameskip = false; // was true
-int audio_enabled = 0;  // Set to 1 to enable audio. Now disabled because its is not properly working.
+int audio_enabled = 1;  // Set to 1 to enable audio. Now disabled because its is not properly working.
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 0;
 
@@ -81,7 +81,7 @@ extern int hint_pending;
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 
-#define AUDIOBUFFERSIZE 1024
+#define AUDIOBUFFERSIZE (1024 * 16)
 // Overclock tests:
 // 252000 OK
 // 266000 OK
@@ -95,7 +95,7 @@ int sn76489_clock;
 // 328000 Not supported signal on samsung tv
 // 330000 Not supported signal on samsung tv
 // 340000 Not supported signal on samsung tv
-#define EMULATOR_CLOCKFREQ_KHZ  252000 // 324000 Overclock frequency in kHz when using Emulator
+#define EMULATOR_CLOCKFREQ_KHZ 324000 // 324000 Overclock frequency in kHz when using Emulator
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 
@@ -380,6 +380,42 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer
     }
 }
 #endif
+void inline output_audio_per_frame() {
+ 
+    // 1. Calculate total PSG clocks for this frame
+    const bool is_pal = REG1_PAL;
+    const int lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
+    const int target_clocks = lines_per_frame * VDP_CYCLES_PER_LINE;
+
+    // 2. Generate all audio samples for the frame
+    gwenesis_SN76489_run(target_clocks);
+
+    // 3. Output audio buffer
+    // Example: output to DVI ring buffer (stereo, duplicate mono)
+    auto &ring = dvi_->getAudioRingBuffer();
+    int totalSamples = sn76489_index; // Number of samples generated this frame
+    int written = 0;
+    static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
+    for (int h = 0; h < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; h++) {
+                snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+    }
+   // printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
+    while (written < (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2)) {
+        int n = std::min<int>(GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2 - written, ring.getWritableSize());
+        if (n == 0) {
+           //  printf("Audio buffer full, wrote %d of %d samples\n", written, totalSamples);
+            // Buffer full, can't write more
+            break;
+        }
+        auto p = ring.getWritePointer();
+        for (int i = 0; i < n; ++i) {
+            int16_t sample = (snd_buf[written + i]) >>2;
+            *p++ = {sample, sample}; // Duplicate mono to stereo
+        }
+        ring.advanceWritePointer(n);
+        written += n;
+    }
+}
 void __not_in_flash_func(emulate)()
 {
 
@@ -564,7 +600,8 @@ void __not_in_flash_func(emulate)()
 
         if (audio_enabled)
         {
-            gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
+           //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
+            output_audio_per_frame();
         }
         // ym2612_run(262 * VDP_CYCLES_PER_LINE);
         /*
