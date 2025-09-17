@@ -81,7 +81,7 @@ extern int hint_pending;
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 
-#define AUDIOBUFFERSIZE (1024 * 16)
+#define AUDIOBUFFERSIZE (1024 * 2)
 // Overclock tests:
 // 252000 OK
 // 266000 OK
@@ -95,7 +95,7 @@ int sn76489_clock;
 // 328000 Not supported signal on samsung tv
 // 330000 Not supported signal on samsung tv
 // 340000 Not supported signal on samsung tv
-#define EMULATOR_CLOCKFREQ_KHZ 324000 // 324000 Overclock frequency in kHz when using Emulator
+#define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 
@@ -393,13 +393,19 @@ void inline output_audio_per_frame() {
     // 3. Output audio buffer
     // Example: output to DVI ring buffer (stereo, duplicate mono)
     auto &ring = dvi_->getAudioRingBuffer();
+    // GWENESIS_AUDIO_SAMPLING_DIVISOR  --> totalSamples
+    //                        6               148
+    //                        5               177
+    //                        1               888   
     int totalSamples = sn76489_index; // Number of samples generated this frame
     int written = 0;
-    static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
-    for (int h = 0; h < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; h++) {
-                snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-    }
-   // printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
+    // sizeof snd_buf = 3522, idem as gwenesis_sn76489_buffer
+    
+    // static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
+    // for (int h = 0; h < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; h++) {
+    //             snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+    // }
+    //printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
     while (written < (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2)) {
         int n = std::min<int>(GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2 - written, ring.getWritableSize());
         if (n == 0) {
@@ -409,7 +415,7 @@ void inline output_audio_per_frame() {
         }
         auto p = ring.getWritePointer();
         for (int i = 0; i < n; ++i) {
-            int16_t sample = (snd_buf[written + i]) >>2;
+            int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >>2;
             *p++ = {sample, sample}; // Duplicate mono to stereo
         }
         ring.advanceWritePointer(n);
