@@ -439,13 +439,13 @@ void inline output_audio_per_frame()
 #else
      for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i++)
     {
-        uint16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >> 4;
-        uint16_t r = l;
-        EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
+        int16_t s = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+        s >>= 4;   
+        EXT_AUDIO_ENQUEUE_SAMPLE(s, s);
 #if ENABLE_VU_METER
         if (settings.flags.enableVUMeter)
         {
-            addSampleToVUMeter(l);
+            addSampleToVUMeter(s);
         }
 #endif
     }
