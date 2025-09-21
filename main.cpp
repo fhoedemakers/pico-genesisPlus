@@ -67,7 +67,7 @@ bool interlace = true; // was true
 int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
-bool limit_fps = false;  // was true
+bool limit_fps = false; // was true
 bool frameskip = false; // was true
 int audio_enabled = 1;  // Set to 1 to enable audio. Now disabled because its is not properly working.
 bool sn76489_enabled = true;
@@ -95,7 +95,11 @@ int sn76489_clock;
 // 328000 Not supported signal on samsung tv
 // 330000 Not supported signal on samsung tv
 // 340000 Not supported signal on samsung tv
+#if !HSTX
 #define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
+#else
+#define EMULATOR_CLOCKFREQ_KHZ 324000 // 266000 Overclock frequency in kHz when using HSTX
+#endif
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 
@@ -153,7 +157,12 @@ int ProcessAfterFrameIsRendered()
 #if NES_PIN_CLK != -1
     nespad_read_start();
 #endif
-    auto count = dvi_->getFrameCounter();
+    auto count =
+#if !HSTX
+        dvi_->getFrameCounter();
+#else
+        hstx_getframecounter();
+#endif
     auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
     Frens::blinkLed(onOff);
 #if NES_PIN_CLK != -1
@@ -182,6 +191,7 @@ static constexpr int C = 1 << 8;
 
 void toggleScreenMode()
 {
+#if !HSTX
     if (settings.screenMode == ScreenMode::SCANLINE_1_1)
     {
         settings.screenMode = ScreenMode::NOSCANLINE_1_1;
@@ -192,6 +202,9 @@ void toggleScreenMode()
     }
     Frens::savesettings();
     Frens::applyScreenMode(settings.screenMode);
+#else
+    Frens::toggleScanLines();
+#endif
 }
 void gwenesis_io_get_buttons()
 {
@@ -303,18 +316,15 @@ const uint8_t __not_in_flash_func(paletteBrightness)[] = {0, 52, 87, 116, 144, 1
 
 extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
 {
-#if !HSTX
-    // RGB444
     uint8_t b = paletteBrightness[(color >> 9) & 0x0F];
     uint8_t g = paletteBrightness[(color >> 5) & 0x0F];
     uint8_t r = paletteBrightness[(color >> 1) & 0x0F];
+#if !HSTX
+    // RGB444
     palette[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
 #else
-    // RGB565
-    uint8_t b = (color >> 8) & 0xF8;
-    uint8_t g = (color >> 5) & 0xFC;
-    uint8_t r = (color >> 3) & 0xF8;
-    palette[index] = (r << 8) | (g << 3) | (b >> 3);
+    // RGB555
+    palette[index] = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
 #endif
 }
 #if 0
@@ -380,8 +390,9 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer
     }
 }
 #endif
-void inline output_audio_per_frame() {
- 
+
+void inline output_audio_per_frame()
+{
     // 1. Calculate total PSG clocks for this frame
     const bool is_pal = REG1_PAL;
     const int lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
@@ -389,6 +400,7 @@ void inline output_audio_per_frame() {
 
     // 2. Generate all audio samples for the frame
     gwenesis_SN76489_run(target_clocks);
+#if !HSTX
 
     // 3. Output audio buffer
     // Example: output to DVI ring buffer (stereo, duplicate mono)
@@ -396,32 +408,38 @@ void inline output_audio_per_frame() {
     // GWENESIS_AUDIO_SAMPLING_DIVISOR  --> totalSamples
     //                        6               148
     //                        5               177
-    //                        1               888   
+    //                        1               888
     int totalSamples = sn76489_index; // Number of samples generated this frame
     int written = 0;
     // sizeof snd_buf = 3522, idem as gwenesis_sn76489_buffer
-    
+
     // static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
     // for (int h = 0; h < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; h++) {
     //             snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
     // }
-    //printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
-    while (written < (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2)) {
+    // printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
+    while (written < (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2))
+    {
         int n = std::min<int>(GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2 - written, ring.getWritableSize());
-        if (n == 0) {
-           //  printf("Audio buffer full, wrote %d of %d samples\n", written, totalSamples);
+        if (n == 0)
+        {
+            //  printf("Audio buffer full, wrote %d of %d samples\n", written, totalSamples);
             // Buffer full, can't write more
             break;
         }
         auto p = ring.getWritePointer();
-        for (int i = 0; i < n; ++i) {
-            int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >>2;
+        for (int i = 0; i < n; ++i)
+        {
+            int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >> 2;
             *p++ = {sample, sample}; // Duplicate mono to stereo
         }
         ring.advanceWritePointer(n);
         written += n;
     }
+#else
+#endif
 }
+
 void __not_in_flash_func(emulate)()
 {
 
@@ -536,8 +554,12 @@ void __not_in_flash_func(emulate)()
             system_clock += VDP_CYCLES_PER_LINE;
             if (scan_line < screen_height)
             {
-                auto currentLineBuf = &Frens::framebuffer[(scan_line + 8) * 320];
-
+                auto currentLineBuf =
+#if !HSTX
+                    &Frens::framebuffer[(scan_line + 8) * 320];
+#else
+                    hstx_getlineFromFramebuffer(scan_line + 8);
+#endif
                 for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
                 {
                     if (kol < screen_width + 32)
@@ -606,7 +628,7 @@ void __not_in_flash_func(emulate)()
 
         if (audio_enabled)
         {
-           //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
+            //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
             output_audio_per_frame();
         }
         // ym2612_run(262 * VDP_CYCLES_PER_LINE);
@@ -687,12 +709,14 @@ int main()
             menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md, .bin", selectedRom, "MD"); // never returns, but reboots upon selecting a game
         }
 #endif
+#if !HSTX
         if (settings.screenMode != ScreenMode::SCANLINE_1_1 && settings.screenMode != ScreenMode::NOSCANLINE_1_1)
         {
             settings.screenMode = ScreenMode::SCANLINE_1_1;
             Frens::savesettings();
         }
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
+#endif
         // dvi_->getBlankSettings().top = 8 * 2;
         // dvi_->getBlankSettings().bottom = 8 * 2;
         reset = false;
