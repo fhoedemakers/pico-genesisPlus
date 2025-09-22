@@ -437,10 +437,10 @@ void inline output_audio_per_frame()
         written += n;
     }
 #else
-     for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i++)
+    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i++)
     {
         int16_t s = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        s >>= 4;   
+        s >>= 4;
         EXT_AUDIO_ENQUEUE_SAMPLE(s, s);
 #if ENABLE_VU_METER
         if (settings.flags.enableVUMeter)
@@ -488,7 +488,15 @@ void __not_in_flash_func(emulate)()
         scan_line = 0;
         if (z80_enable_mode == 1)
             z80_run(lines_per_frame * VDP_CYCLES_PER_LINE);
-
+        auto margin = SCREENHEIGHT - screen_height;
+        if (margin > 0)
+        {
+            margin   /= 2;
+        }
+        else
+        {
+            margin = 0;
+        }
         while (scan_line < lines_per_frame)
         {
             // if (audio_enabled)
@@ -564,11 +572,12 @@ void __not_in_flash_func(emulate)()
             }
 
             system_clock += VDP_CYCLES_PER_LINE;
+
             if (scan_line < screen_height)
             {
                 auto currentLineBuf =
 #if !HSTX
-                    &Frens::framebuffer[(scan_line + 8) * 320];
+                    &Frens::framebuffer[(scan_line + margin) * 320];
 #else
                     hstx_getlineFromFramebuffer(scan_line + 8);
 #endif
