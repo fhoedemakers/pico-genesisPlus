@@ -71,7 +71,7 @@ bool limit_fps = false; // was true
 bool frameskip = false; // was true
 int audio_enabled = 1;  // Set to 1 to enable audio. Now disabled because its is not properly working.
 bool sn76489_enabled = true;
-uint8_t snd_accurate = 0;
+uint8_t snd_accurate = 1;
 
 extern unsigned char gwenesis_vdp_regs[0x20];
 extern unsigned int gwenesis_vdp_status;
