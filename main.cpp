@@ -579,7 +579,7 @@ void __not_in_flash_func(emulate)()
 #if !HSTX
                     &Frens::framebuffer[(scan_line + margin) * 320];
 #else
-                    hstx_getlineFromFramebuffer(scan_line + 8);
+                    hstx_getlineFromFramebuffer(scan_line + margin);
 #endif
                 for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
                 {
