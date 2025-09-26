@@ -80,6 +80,7 @@ extern int hint_pending;
 
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
+bool toggleDebugFPS = false;
 
 #define AUDIOBUFFERSIZE (1024 * 2)
 // Overclock tests:
@@ -163,6 +164,12 @@ int ProcessAfterFrameIsRendered()
 #else
         hstx_getframecounter();
 #endif
+    int myFcounter = Frens::getFrameCount();
+    if (toggleDebugFPS)
+    {
+        printf("Frame %d, DVI Frame %u\n", myFcounter, count);
+    }
+
     auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
     Frens::blinkLed(onOff);
 #if NES_PIN_CLK != -1
@@ -208,6 +215,7 @@ void toggleScreenMode()
 }
 void gwenesis_io_get_buttons()
 {
+    char timebuf[10];
     bool usbConnected = false;
     for (int i = 0; i < 2; i++)
     {
@@ -279,24 +287,57 @@ void gwenesis_io_get_buttons()
                 reboot = true;
                 printf("Reset pressed\n");
             }
-        }
-        if (p1 & START)
-        {
-            // Toggle frame rate display
-            if (pushed & A)
+            else if (pushed & UP)
+            {
+                toggleScreenMode();
+            }
+            else if (pushed & DOWN)
+            {
+
+                toggleDebugFPS = !toggleDebugFPS;
+                Frens::ms_to_d_hhmmss(Frens::time_ms(), timebuf, sizeof timebuf);
+                printf("Uptime %s, Debug FPS %s\n", timebuf, toggleDebugFPS ? "ON" : "OFF");
+            }
+            else if (pushed & LEFT)
+            {
+                // Toggle audio output, ignore if HSTX is enabled, because HSTX must use external audio
+#if EXT_AUDIO_IS_ENABLED && !HSTX
+                settings.flags.useExtAudio = !settings.flags.useExtAudio;
+                if (settings.flags.useExtAudio)
+                {
+                    printf("Using I2S Audio\n");
+                }
+                else
+                {
+                    printf("Using DVIAudio\n");
+                }
+
+#else
+                settings.flags.useExtAudio = 0;
+#endif
+                Frens::savesettings();
+            }
+            else if (pushed & RIGHT)
+            {
+                audio_enabled = !audio_enabled;
+                printf("Audio %s\n", audio_enabled ? "enabled" : "disabled");
+            }
+            else if (pushed & A)
             {
                 fps_enabled = !fps_enabled;
                 printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
             }
-            if (pushed & UP)
-            {
-                toggleScreenMode();
-            }
-            // else if (pushed & DOWN)
-            // {
-            //     toggleScreenMode();
-            // }
         }
+        // if (p1 & START)
+        // {
+        //     // Toggle frame rate display
+        //     if (pushed & A)
+        //     {
+        //         fps_enabled = !fps_enabled;
+        //         printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
+        //     }
+
+        // }
         sizeof(unsigned short);
         prevButtons[i] = v;
         button_state[i] = ((v & LEFT) ? 1 << PAD_LEFT : 0) |
@@ -431,9 +472,28 @@ void inline output_audio_per_frame()
         for (int i = 0; i < n; ++i)
         {
             int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >> 2;
+#if EXT_AUDIO_IS_ENABLED
+            if (settings.flags.useExtAudio)
+            {
+                // uint32_t sample32 = (l << 16) | (r & 0xFFFF);
+                EXT_AUDIO_ENQUEUE_SAMPLE(sample, sample);
+            }
+            else
+            {
+                *p++ = {sample, sample}; // Duplicate mono to stereo
+            }
+#else
             *p++ = {sample, sample}; // Duplicate mono to stereo
+#endif
         }
+#if EXT_AUDIO_IS_ENABLED
+        if (!settings.flags.useExtAudio)
+        {
+            ring.advanceWritePointer(n);
+        }
+#else
         ring.advanceWritePointer(n);
+#endif
         written += n;
     }
 #else
@@ -460,6 +520,7 @@ void __not_in_flash_func(emulate)()
     bool firstLoop = true;
     unsigned int old_screen_width = 0;
     unsigned int old_screen_height = 0;
+    char tbuf[32];
     while (!reboot)
     {
         /* Eumulator loop */
@@ -472,7 +533,7 @@ void __not_in_flash_func(emulate)()
         // Printf values
         if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
         {
-            printf("is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", is_pal, screen_width, screen_height, lines_per_frame);
+            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame);
             firstLoop = false;
             old_screen_height = screen_height;
             old_screen_width = screen_width;
@@ -491,7 +552,7 @@ void __not_in_flash_func(emulate)()
         auto margin = SCREENHEIGHT - screen_height;
         if (margin > 0)
         {
-            margin   /= 2;
+            margin /= 2;
         }
         else
         {
@@ -541,38 +602,6 @@ void __not_in_flash_func(emulate)()
                 }
                 hint_counter = REG10_LINE_COUNTER;
             }
-            // if (line_buffer)
-            // {
-            //     dvi_->setLineBuffer(scan_line, current_dvi_buffer);
-            // }
-            scan_line++;
-
-            // vblank begin at the end of last rendered line
-            if (scan_line == screen_height)
-            {
-                if (REG1_VBLANK_INTERRUPT != 0)
-                {
-                    gwenesis_vdp_status |= STATUS_VIRQPENDING;
-                    m68k_set_irq(6);
-                }
-                z80_irq_line(1);
-            }
-
-            if (!is_pal && scan_line == screen_height + 1)
-            {
-                z80_irq_line(0);
-                // FRAMESKIP every 3rd frame
-                // drawFrame = frameskip && frame % 3 != 0;
-                drawFrame = 1;
-                // if (frameskip && frame % 3 == 0) {
-                //     drawFrame = 0;
-                // } else {
-                //     drawFrame = 1;
-                // }
-            }
-
-            system_clock += VDP_CYCLES_PER_LINE;
-
             if (scan_line < screen_height)
             {
                 auto currentLineBuf =
@@ -622,6 +651,35 @@ void __not_in_flash_func(emulate)()
                     }
                 }
             }
+            scan_line++;
+
+            // vblank begin at the end of last rendered line
+            if (scan_line == screen_height)
+            {
+                if (REG1_VBLANK_INTERRUPT != 0)
+                {
+                    gwenesis_vdp_status |= STATUS_VIRQPENDING;
+                    m68k_set_irq(6);
+                }
+                z80_irq_line(1);
+            }
+
+            if (!is_pal && scan_line == screen_height + 1)
+            {
+                z80_irq_line(0);
+                // FRAMESKIP every 3rd frame
+                // drawFrame = frameskip && frame % 3 != 0;
+                drawFrame = 1;
+                // if (frameskip && frame % 3 == 0) {
+                //     drawFrame = 0;
+                // } else {
+                //     drawFrame = 1;
+                // }
+            }
+
+            system_clock += VDP_CYCLES_PER_LINE;
+
+           
         }
 
         ProcessAfterFrameIsRendered();
