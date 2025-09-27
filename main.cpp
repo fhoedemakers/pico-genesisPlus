@@ -164,11 +164,6 @@ int ProcessAfterFrameIsRendered()
 #else
         hstx_getframecounter();
 #endif
-    int myFcounter = Frens::getFrameCount();
-    if (toggleDebugFPS)
-    {
-        printf("Frame %d, DVI Frame %u\n", myFcounter, count);
-    }
 
     auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
     Frens::blinkLed(onOff);
