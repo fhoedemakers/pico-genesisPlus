@@ -680,26 +680,17 @@ void __not_in_flash_func(emulate)()
         ProcessAfterFrameIsRendered();
 
         frame++;
-        if (limit_fps)
-        {
+
+        if (limit_fps) {
             frame_cnt++;
-            if (frame_cnt == (is_pal ? 5 : 6))
-            {
-                // int cnt = 0;
-                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6))
-                {
+            if (frame_cnt == (is_pal ? 5 : 6)) {
+                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6)) {
                     busy_wait_at_least_cycles(10);
-                    // cnt++;
                 }; // 60 Hz
                 frame_timer_start = time_us_64();
                 frame_cnt = 0;
-                // if (cnt > 1)
-                // {
-                //     printf("cnt: %d\n", cnt);
-                // }
             }
         }
-
         if (audio_enabled)
         {
             //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
