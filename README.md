@@ -1,4 +1,4 @@
-# Pico-genesisPlus
+§# Pico-genesisPlus
 
 A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display.
 
@@ -6,8 +6,8 @@ Sound currently nog working. Help wanted.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
-Due to the flash size of the Raspberry Pi pico 2, 4MB roms cannot be loaded. The menu will not show roms too large for the Pico 2.
-Also not every game is guaranteed to work.
+Unless your board has PSRAM, due to the flash size of the Raspberry Pi pico 2, 4MB roms cannot be loaded. The menu will not show roms too large for the Pico 2.
+Also not every game is guaranteed to work. When PSRAM is available, 4MB roms can be loaded.
 
 > [!WARNING]  
 > It is possible that some monitors/televisions do not show an image. 
