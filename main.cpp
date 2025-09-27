@@ -427,17 +427,9 @@ void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer
 }
 #endif
 
-void inline output_audio_per_frame()
-{
-    // 1. Calculate total PSG clocks for this frame
-    const bool is_pal = REG1_PAL;
-    const int lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
-    const int target_clocks = lines_per_frame * VDP_CYCLES_PER_LINE;
-
-    // 2. Generate all audio samples for the frame
-    gwenesis_SN76489_run(target_clocks);
 #if !HSTX
-
+static void inline processaudioPerFrameDVI()
+{
     // 3. Output audio buffer
     // Example: output to DVI ring buffer (stereo, duplicate mono)
     auto &ring = dvi_->getAudioRingBuffer();
@@ -467,43 +459,52 @@ void inline output_audio_per_frame()
         for (int i = 0; i < n; ++i)
         {
             int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >> 2;
-#if EXT_AUDIO_IS_ENABLED
-            if (settings.flags.useExtAudio)
-            {
-                // uint32_t sample32 = (l << 16) | (r & 0xFFFF);
-                EXT_AUDIO_ENQUEUE_SAMPLE(sample, sample);
-            }
-            else
-            {
-                *p++ = {sample, sample}; // Duplicate mono to stereo
-            }
-#else
             *p++ = {sample, sample}; // Duplicate mono to stereo
-#endif
         }
-#if EXT_AUDIO_IS_ENABLED
-        if (!settings.flags.useExtAudio)
-        {
-            ring.advanceWritePointer(n);
-        }
-#else
         ring.advanceWritePointer(n);
-#endif
         written += n;
     }
-#else
-    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i++)
+}
+#endif
+static void inline processaudioPerFrameI2S()
+{
+    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i+=2)
     {
-        int16_t s = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        s >>= 4;
-        EXT_AUDIO_ENQUEUE_SAMPLE(s, s);
+        int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+        int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+        l >>= 4;
+        r >>= 4;
+        EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
 #if ENABLE_VU_METER
         if (settings.flags.enableVUMeter)
         {
-            addSampleToVUMeter(s);
+            addSampleToVUMeter(l);
         }
 #endif
     }
+}
+void inline output_audio_per_frame()
+{
+    // 1. Calculate total PSG clocks for this frame
+    const bool is_pal = REG1_PAL;
+    const int lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
+    const int target_clocks = lines_per_frame * VDP_CYCLES_PER_LINE;
+
+    // 2. Generate all audio samples for the frame
+    gwenesis_SN76489_run(target_clocks);
+#if !HSTX
+    #if EXT_AUDIO_IS_ENABLED
+        if (settings.flags.useExtAudio == 1)
+        {
+            processaudioPerFrameI2S();
+        } else {
+            processaudioPerFrameDVI();
+        }
+#else
+        processaudioPerFrameDVI();
+#endif
+#else
+    processaudioPerFrameI2S();
 #endif
 }
 
@@ -673,18 +674,19 @@ void __not_in_flash_func(emulate)()
             }
 
             system_clock += VDP_CYCLES_PER_LINE;
-
-           
         }
 
         ProcessAfterFrameIsRendered();
 
         frame++;
 
-        if (limit_fps) {
+        if (limit_fps)
+        {
             frame_cnt++;
-            if (frame_cnt == (is_pal ? 5 : 6)) {
-                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6)) {
+            if (frame_cnt == (is_pal ? 5 : 6))
+            {
+                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6))
+                {
                     busy_wait_at_least_cycles(10);
                 }; // 60 Hz
                 frame_timer_start = time_us_64();
