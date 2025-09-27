@@ -6,8 +6,7 @@ Sound currently nog working. Help wanted.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
-Unless your board has PSRAM, due to the flash size of the Raspberry Pi pico 2, 4MB roms cannot be loaded. The menu will not show roms too large for the Pico 2.
-Also not every game is guaranteed to work. When PSRAM is available, 4MB roms can be loaded.
+The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appear in the menu. Game compatibility is not guaranteed. With PSRAM, 4 MB ROMs are supported.
 
 > [!WARNING]  
 > It is possible that some monitors/televisions do not show an image. 
