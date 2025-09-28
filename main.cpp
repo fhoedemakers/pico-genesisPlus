@@ -347,6 +347,15 @@ void gwenesis_io_get_buttons()
                           ((v & C) ? 1 << PAD_C : 0) |
                           ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
+#if ENABLE_VU_METER
+        if (isVUMeterToggleButtonPressed())
+        {
+            settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
+            Frens::savesettings();
+            // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
+            turnOffAllLeds();
+        }
+#endif
     }
 }
 
