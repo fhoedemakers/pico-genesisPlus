@@ -67,9 +67,10 @@ bool interlace = true; // was true
 int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
-bool limit_fps = false; // was true
-bool frameskip = false; // was true
-int audio_enabled = 1;  // Set to 1 to enable audio. Now disabled because its is not properly working.
+bool limit_fps = true; // was true
+
+int audio_enabled = 1;          // Set to 1 to enable audio. Now disabled because its is not properly working.
+bool frameskip = audio_enabled; // was true
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 1;
 
@@ -82,7 +83,7 @@ int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 bool toggleDebugFPS = false;
 
-#define AUDIOBUFFERSIZE (1024 * 2)
+#define AUDIOBUFFERSIZE (1024 * 4)
 // Overclock tests:
 // 252000 OK
 // 266000 OK
@@ -315,7 +316,8 @@ void gwenesis_io_get_buttons()
             else if (pushed & RIGHT)
             {
                 audio_enabled = !audio_enabled;
-                printf("Audio %s\n", audio_enabled ? "enabled" : "disabled");
+                frameskip = audio_enabled;
+                printf("Audio %s, Frameskip %s\n", audio_enabled ? "enabled" : "disabled", frameskip ? "enabled" : "disabled");
             }
             else if (pushed & A)
             {
@@ -468,7 +470,7 @@ static void inline processaudioPerFrameDVI()
 #endif
 static void inline processaudioPerFrameI2S()
 {
-    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i+=2)
+    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i += 2)
     {
         int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
         int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
@@ -493,15 +495,17 @@ void inline output_audio_per_frame()
     // 2. Generate all audio samples for the frame
     gwenesis_SN76489_run(target_clocks);
 #if !HSTX
-    #if EXT_AUDIO_IS_ENABLED
-        if (settings.flags.useExtAudio == 1)
-        {
-            processaudioPerFrameI2S();
-        } else {
-            processaudioPerFrameDVI();
-        }
-#else
+#if EXT_AUDIO_IS_ENABLED
+    if (settings.flags.useExtAudio == 1)
+    {
+        processaudioPerFrameI2S();
+    }
+    else
+    {
         processaudioPerFrameDVI();
+    }
+#else
+    processaudioPerFrameDVI();
 #endif
 #else
     processaudioPerFrameI2S();
@@ -529,7 +533,8 @@ void __not_in_flash_func(emulate)()
         // Printf values
         if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
         {
-            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame);
+            // printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame);
+            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d, audio_enabled: %d, frameskip: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame, audio_enabled, frameskip);
             firstLoop = false;
             old_screen_height = screen_height;
             old_screen_width = screen_width;
@@ -572,13 +577,90 @@ void __not_in_flash_func(emulate)()
             // Interlace mode
             // if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0)
             // {
-            // if (drawFrame) {
-            // if (scan_line < 240)
-            // {
-            //     frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
-            // }
-            gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
-            // }
+            if (drawFrame)
+            {
+                // if (scan_line < 240)
+                // {
+                //     frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
+                // }
+                gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
+                if (scan_line < screen_height)
+                {
+                    auto currentLineBuf =
+#if !HSTX
+                        &Frens::framebuffer[(scan_line + margin) * 320];
+#else
+                        hstx_getlineFromFramebuffer(scan_line + margin);
+#endif
+
+#if 0
+                    for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
+                    {
+                        if (kol < screen_width + 32)
+                        {
+                            currentLineBuf[kol] = palette[tmpbuffer[0] & 0x3f];
+                            currentLineBuf[kol + 1] = palette[tmpbuffer[1] & 0x3f];
+                            currentLineBuf[kol + 2] = palette[tmpbuffer[2] & 0x3f];
+                            currentLineBuf[kol + 3] = palette[tmpbuffer[3] & 0x3f];
+                        }
+                        else
+                        {
+                            currentLineBuf[kol] = 0;
+                            currentLineBuf[kol + 1] = 0;
+                            currentLineBuf[kol + 2] = 0;
+                            currentLineBuf[kol + 3] = 0;
+                        }
+                        tmpbuffer += 4;
+                    }
+#else
+                    // Optimized pixel transfer
+                    int start = (screen_width == SCREENWIDTH) ? 0 : 32;
+                    int visible = screen_width;                 // active pixels
+                    int tail = SCREENWIDTH - (start + visible); // right border size
+
+                    uint8_t *src = tmpbuffer;               // source indices
+                    uint16_t *dst = currentLineBuf + start; // destination
+                    const uint16_t *pal = palette;          // palette pointer
+
+                    int groups = visible >> 2; // number of 4-pixel groups
+                    while (groups--)
+                    {
+                        dst[0] = pal[src[0] & 0x3F];
+                        dst[1] = pal[src[1] & 0x3F];
+                        dst[2] = pal[src[2] & 0x3F];
+                        dst[3] = pal[src[3] & 0x3F];
+                        src += 4;
+                        dst += 4;
+                    }
+                    if (tail > 0)
+                    {
+                        memset(dst, 0, tail * sizeof(uint16_t));
+                    }
+#endif
+                    if (fps_enabled && scan_line >= FPSSTART && scan_line < FPSEND)
+                    {
+                        WORD *fpsBuffer = currentLineBuf + 5;
+                        int rowInChar = scan_line % 8;
+                        for (auto i = 0; i < 3; i++)
+                        {
+                            char firstFpsDigit = fpsString[i];
+                            char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
+                            for (auto bit = 0; bit < 8; bit++)
+                            {
+                                if (fontSlice & 1)
+                                {
+                                    *fpsBuffer++ = fpsfgcolor;
+                                }
+                                else
+                                {
+                                    *fpsBuffer++ = fpsbgcolor;
+                                }
+                                fontSlice >>= 1;
+                            }
+                        }
+                    }
+                }
+            }
             // }
 
             // On these lines, the line counter interrupt is reloaded
@@ -598,55 +680,7 @@ void __not_in_flash_func(emulate)()
                 }
                 hint_counter = REG10_LINE_COUNTER;
             }
-            if (scan_line < screen_height)
-            {
-                auto currentLineBuf =
-#if !HSTX
-                    &Frens::framebuffer[(scan_line + margin) * 320];
-#else
-                    hstx_getlineFromFramebuffer(scan_line + margin);
-#endif
-                for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
-                {
-                    if (kol < screen_width + 32)
-                    {
-                        currentLineBuf[kol] = palette[tmpbuffer[0] & 0x3f];
-                        currentLineBuf[kol + 1] = palette[tmpbuffer[1] & 0x3f];
-                        currentLineBuf[kol + 2] = palette[tmpbuffer[2] & 0x3f];
-                        currentLineBuf[kol + 3] = palette[tmpbuffer[3] & 0x3f];
-                    }
-                    else
-                    {
-                        currentLineBuf[kol] = 0;
-                        currentLineBuf[kol + 1] = 0;
-                        currentLineBuf[kol + 2] = 0;
-                        currentLineBuf[kol + 3] = 0;
-                    }
-                    tmpbuffer += 4;
-                }
-                if (fps_enabled && scan_line >= FPSSTART && scan_line < FPSEND)
-                {
-                    WORD *fpsBuffer = currentLineBuf + 5;
-                    int rowInChar = scan_line % 8;
-                    for (auto i = 0; i < 3; i++)
-                    {
-                        char firstFpsDigit = fpsString[i];
-                        char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
-                        for (auto bit = 0; bit < 8; bit++)
-                        {
-                            if (fontSlice & 1)
-                            {
-                                *fpsBuffer++ = fpsfgcolor;
-                            }
-                            else
-                            {
-                                *fpsBuffer++ = fpsbgcolor;
-                            }
-                            fontSlice >>= 1;
-                        }
-                    }
-                }
-            }
+
             scan_line++;
 
             // vblank begin at the end of last rendered line
@@ -664,13 +698,7 @@ void __not_in_flash_func(emulate)()
             {
                 z80_irq_line(0);
                 // FRAMESKIP every 3rd frame
-                // drawFrame = frameskip && frame % 3 != 0;
-                drawFrame = 1;
-                // if (frameskip && frame % 3 == 0) {
-                //     drawFrame = 0;
-                // } else {
-                //     drawFrame = 1;
-                // }
+                drawFrame = !frameskip || (frame % 3 != 0);
             }
 
             system_clock += VDP_CYCLES_PER_LINE;
