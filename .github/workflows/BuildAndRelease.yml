@@ -9,6 +9,7 @@ on:
           - "v*.*-alpha"
           - "v*.*.*"
           - "v*.*"
+    workflow_dispatch:
     #     branches: [ main ]
     # pull_request:
     #     branches: [ main ] 
