@@ -319,23 +319,16 @@ void gwenesis_io_get_buttons()
                 frameskip = audio_enabled;
                 printf("Audio %s, Frameskip %s\n", audio_enabled ? "enabled" : "disabled", frameskip ? "enabled" : "disabled");
             }
-            else if (pushed & A)
+        }
+        if (p1 & START)
+        {
+            // Toggle frame rate display
+            if (pushed & A)
             {
                 fps_enabled = !fps_enabled;
                 printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
             }
         }
-        // if (p1 & START)
-        // {
-        //     // Toggle frame rate display
-        //     if (pushed & A)
-        //     {
-        //         fps_enabled = !fps_enabled;
-        //         printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
-        //     }
-
-        // }
-        sizeof(unsigned short);
         prevButtons[i] = v;
         button_state[i] = ((v & LEFT) ? 1 << PAD_LEFT : 0) |
                           ((v & RIGHT) ? 1 << PAD_RIGHT : 0) |
