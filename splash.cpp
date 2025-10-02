@@ -32,12 +32,17 @@ void splash()
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 9, s, fgcolorSplash, bgcolorSplash);
     strcpy(s, "@frenskefrens");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 10, s, CBLUE, bgcolorSplash);
-
+#if !HSTX
     strcpy(s, "DVI Support");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 13, s, fgcolorSplash, bgcolorSplash);
     strcpy(s, "@shuichi_takano");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 14, s, CBLUE, bgcolorSplash);
-
+#else 
+    strcpy(s, "HSTX video driver & I2S audio");
+    putText(SCREEN_COLS / 2 - strlen(s) / 2, 13, s, fgcolorSplash, bgcolorSplash);
+    strcpy(s, "@frenskefrens");
+    putText(SCREEN_COLS / 2 - strlen(s) / 2, 14, s, CBLUE, bgcolorSplash);
+#endif
     strcpy(s, "(S)NES/WII controller support");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 17, s, fgcolorSplash, bgcolorSplash);
 
@@ -47,11 +52,14 @@ void splash()
     strcpy(s, "PCB Design");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 21, s, fgcolorSplash, bgcolorSplash);
 
-    strcpy(s, "@johnedgarpark");
+    strcpy(s, "@johnedgarpark & DynaMight");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 22, s, CBLUE, bgcolorSplash);
 
+    strcpy(s, "3D case, metadata, artwork: Dynamight");
+    putText(SCREEN_COLS / 2 - strlen(s) / 2, 24, s, fgcolorSplash, bgcolorSplash);
+
     strcpy(s, "https://github.com/");
-    putText(SCREEN_COLS / 2 - strlen(s) / 2, 25, s, CBLUE, bgcolorSplash);
-    strcpy(s, "fhoedemakers/pico-genesisPlus");
     putText(SCREEN_COLS / 2 - strlen(s) / 2, 26, s, CBLUE, bgcolorSplash);
+    strcpy(s, "fhoedemakers/pico-genesisPlus");
+    putText(SCREEN_COLS / 2 - strlen(s) / 2, 27, s, CBLUE, bgcolorSplash);
 }
