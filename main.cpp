@@ -1,11 +1,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
-#include "hardware/clocks.h"
-#include "hardware/vreg.h"
 #include "hardware/watchdog.h"
-#include "hardware/pll.h"
-#include "hardware/uart.h" 
 #include "util/work_meter.h"
 #include "ff.h"
 #include "tusb.h"
