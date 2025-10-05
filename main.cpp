@@ -474,8 +474,8 @@ static void inline processaudioPerFrameI2S()
     {
         int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
         int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        l >>= 4;
-        r >>= 4;
+        l >>= 3;
+        r >>= 3;
         EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
 #if ENABLE_VU_METER
         if (settings.flags.enableVUMeter)
