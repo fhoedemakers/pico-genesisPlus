@@ -1,15 +1,16 @@
-§# Pico-genesisPlus
+# Pico-genesisPlus
 
 A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display.
 
-Sound currently nog working. Help wanted.
+Sound works but is quality is not good. You can disable sound with SELECT + RIGHT on the controller.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
-The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appear in the menu. Game compatibility is not guaranteed. With PSRAM, 4 MB ROMs are supported.
+The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appear in the menu. Game compatibility is not guaranteed. With PSRAM, 4 MB ROMs or higher are supported.
 
 > [!WARNING]  
-> It is possible that some monitors/televisions do not show an image. 
+> Because of the high overclock, the emulator sets the monitor refresh rate to 77.1 Hz. Some monitors may not support this refresh rate. If you experience problems, try a different monitor or TV.
+> This does not occur on HSTX based boards like Adafruit Fruit Jam, the monitor refresh rate can be set to 60 Hz.
 
 ## Setup
 
@@ -28,7 +29,12 @@ The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appe
 To go back to the menu press Select + Start. Genesis mini controller C + Start.
 Start + A toggles the framerate display.
 Start + Dpad up toggles scanlines.
-
+Select + Right toggles sound on/off. This increases the emulation speed a bit.
+** Pimoroni Pico DV Demo base only **:  Select + Left: Toggles between I2S audio and DVI audio. 
+**Fruit Jam Only** 
+  - Button 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
+  - SELECT + UP: Toggle scanlines. 
+  - Button 2 (on board) or SELECT + RIGHT: Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
 
 In menu:
 - D-Pad: Move selection.
