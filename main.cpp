@@ -5,7 +5,7 @@
 #include "hardware/vreg.h"
 #include "hardware/watchdog.h"
 #include "hardware/pll.h"
-#include "hardware/uart.h"          // <-- add
+#include "hardware/uart.h" 
 #include "util/work_meter.h"
 #include "ff.h"
 #include "tusb.h"
@@ -778,64 +778,16 @@ int main()
     ErrorMessage[0] = selectedRom[0] = 0;
 
     int fileSize = 0;
-
-    // Set voltage and clock frequency
-    vreg_set_voltage(VREG_VOLTAGE_1_30);   // 1.30V for high overclock stability
-    sleep_ms(10);
-    set_sys_clock_khz(CPUFreqKHz, true);   // Overclock sys clock
-
-#if HSTX
-    // (Re)configure PLL_USB for 126 MHz HSTX source (breaks USB CDC, use UART)
-    pll_deinit(pll_usb);
-    pll_init(pll_usb, 1, 756000000, 6, 1); // 756 / (6*1) = 126 MHz
-#endif
-
-    uint32_t sys_hz = clock_get_hz(clk_sys);
-    const uint32_t target_hstx_hz = 126000000u;
-    uint32_t chosen_hstx_hz = target_hstx_hz;
-
-#if HSTX
-    if (!clock_configure(
-            clk_hstx,
-            0,
-            CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
-            target_hstx_hz,
-            target_hstx_hz))
-    {
-        printf("HSTX clock configure failed (pre-stdio)\n"); // (will print later)
-        chosen_hstx_hz = clock_get_hz(clk_hstx);
-    }
-#endif
-
-    // Keep clk_peri at a safe frequency for UART (48 MHz here)
-    {
-        uint32_t sys_hz_now = clock_get_hz(clk_sys);
-        const uint32_t peri_target = 48 * 1000 * 1000; // or 96*1000*1000
-        clock_configure(clk_peri,
-                        0,  // no GLMUX
-                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                        sys_hz_now,     // input freq (PLL SYS)
-                        peri_target);   // target clk_peri
-    }
-
-    // Re-init stdio AFTER all clock changes.
-    // Use pure UART (not USB) so CDC is not needed after repurposing PLL_USB.
-    stdio_deinit_all();
-    uart_deinit(uart0);
-    // Init UART after clk_peri fixed
-    stdio_uart_init_full(uart0, 115200, PICO_DEFAULT_UART_TX_PIN, PICO_DEFAULT_UART_RX_PIN);
-    // Optionally force & report exact baud
-    uint actual = uart_set_baudrate(uart0, 115200);
-    uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
-    uart_set_fifo_enabled(uart0, true);
-    sleep_ms(50);
-    printf("UART clk_peri=%u Hz, requested 115200, actual %u\n", clock_get_hz(clk_peri), actual);
+    Frens::setClocksAndStartStdio(CPUFreqKHz, VREG_VOLTAGE_1_30);
 
     printf("==========================================================================================\n");
     printf("Pico-Genesis+ %s\n", SWVERSION);
     printf("Build date: %s\n", __DATE__);
     printf("Build time: %s\n", __TIME__);
     printf("CPU freq: %d kHz\n", clock_get_hz(clk_sys) / 1000);
+#if HSTX
+    printf("HSTX freq: %d kHz\n", clock_get_hz(clk_hstx) / 1000);
+#endif
     printf("Stack size: %d bytes\n", PICO_STACK_SIZE);
     printf("==========================================================================================\n");
     printf("Starting up...\n");
@@ -862,25 +814,9 @@ int main()
         }
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
 #endif
-        // dvi_->getBlankSettings().top = 8 * 2;
-        // dvi_->getBlankSettings().bottom = 8 * 2;
+ 
         reset = false;
-#if 0
-        FRESULT fr;
-        FIL file;
-        fr = f_open(&file, selectedRom, FA_READ);
-        if (fr != FR_OK)
-        {
-            snprintf(ErrorMessage, 40, "Cannot open rom %d", fr);
-            printf("%s\n", ErrorMessage);
-            selectedRom[0] = 0;
-            continue;
-        }
-        fileSize = f_size(&file);
-        f_close(&file);
 
-        printf("Now playing: %s (%d bytes)\n", selectedRom, fileSize);
-#endif
         abSwapped = 0; // don't swap A and B buttons
 
         memset(palette, 0, sizeof(palette));
