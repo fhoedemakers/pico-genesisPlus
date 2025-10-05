@@ -4,6 +4,8 @@ A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads r
 
 Sound works but is quality is not good. You can disable sound with SELECT + RIGHT on the controller.
 
+Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
+
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
 The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appear in the menu. Game compatibility is not guaranteed. With PSRAM, 4 MB ROMs or higher are supported.
