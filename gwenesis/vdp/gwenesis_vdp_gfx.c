@@ -1078,6 +1078,7 @@ static void printbin8(int8_t v)
 // uint8_t tempbuffer[GWENESIS_SCREEN_WIDTH];
 void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint8_t *frame_line_buffer)
 {
+    static bool first_time = true;
     uint8_t *line_buffer =  frame_line_buffer;// &screen_buffer_line[__fast_mul(line, screen_width)];
     mode_h40 = REG12_MODE_H40;
     // mode_pal = REG1_PAL;
@@ -1090,7 +1091,11 @@ void __not_in_flash_func(gwenesis_vdp_render_line)(int line, uint8_t *frame_line
     // interlace mode not implemented
     if (BITS(gwenesis_vdp_regs[12], 1, 2) != 0)
     {
-        printf("Interlace mode not implemented\n");
+        if (first_time)
+        {
+            first_time = false;
+            printf("Interlace mode not implemented\n");
+        }
         return;
     }
 
