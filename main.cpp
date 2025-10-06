@@ -97,13 +97,15 @@ bool toggleDebugFPS = false;
 // 340000 Not supported signal on samsung tv, HSTX works fine
 // 350000 Panic System clock of %u kHz cannot be exactly achieved
 // 360000
+// 378000 Unstable with HSTX
 #if !HSTX
 // NOTE: In PicoDVI, with this overclock the monitor's refresh rate is 77.1 Hz instead of 60 Hz. This does not
 // seem to be a problem for most monitors, but some monitors may not support this refresh rate
 // We cannot clockdvide the HDMI pixel clock to get exactly 60 Hz. https://github.com/Wren6991/PicoDVI/issues/56
 #define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
 #else
-// 340000 Seems to be the highest frequency that works with HSTX. 348000 crashes after a whil in the PIO usb driver.
+// 340000 Seems to be the highest frequency that works with HSTX. 
+// 378000 would be ideal but is unstable with HSTX
 // We can clock hstx so the display refresh rate remains at 60 Hz.
 #define EMULATOR_CLOCKFREQ_KHZ 340000 // 266000 Overclock frequency in kHz when using HSTX
 #endif
