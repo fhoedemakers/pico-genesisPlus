@@ -27,7 +27,8 @@ fi
 # build for Pico 2 (w) -arm-s
 # No pico2_w binaries for HWConfig 1 (#132)
 # no pico_w binaries for HWConfig 2 (#136)
-HWCONFIGS="1 2 5 6 7 8 9 10"
+# No build for WaveShare RP2350-PiZero (#7)
+HWCONFIGS="1 2 5 6 8 9 10"
 for HWCONFIG in $HWCONFIGS
 do
 	./bld.sh -c $HWCONFIG -2 || exit 1
