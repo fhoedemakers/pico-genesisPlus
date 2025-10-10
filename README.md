@@ -1,14 +1,16 @@
 # Pico-genesisPlus
 
-A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display.
+A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display. Works best with [Adafruit Fruitjam](https://www.adafruit.com/product/6200)
 
-Sound works but is quality is not good. You can disable sound with SELECT + RIGHT on the controller.
+Create a FAT32 or exFAT formatted SD card and copy your NES roms and optional metadata on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
+
+Sound works but its quality is not good. You can disable sound with SELECT + RIGHT on the controller.
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
-The Pico 2 cannot load 4 MB ROMs without PSRAM, and oversized ROMs will not appear in the menu. Game compatibility is not guaranteed. With PSRAM, 4 MB ROMs or higher are supported.
+Roms that are to big to load in flash or PSRAM are not listed.
 
 > [!WARNING]  
 > Because of the high overclock, the emulator sets the monitor refresh rate to 77.1 Hz. Some monitors may not support this refresh rate. If you experience problems, try a different monitor or TV.
