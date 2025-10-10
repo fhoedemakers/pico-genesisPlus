@@ -15,7 +15,7 @@ Roms that are to big to load in flash or PSRAM are not listed.
 > [!WARNING]  
 > **Overclock Notice**  
 >  
-> Due to the high overclock, the emulator sets the monitor refresh rate to **77.1 Hz**.  
+> Due to the high overclock, the emulator sets the monitor refresh rate to **77.1 Hz**. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
 > Some monitors may **not support this refresh rate**, which can cause display issues.  
 >  
 > If you experience problems, try using a **different monitor or TV**.  
