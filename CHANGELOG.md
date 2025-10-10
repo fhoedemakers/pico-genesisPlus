@@ -2,7 +2,6 @@
 
 # General Info
 
-# General Info
 
 [Binaries for each configuration and PCB design are at the end of this page](#downloads___).
 
@@ -10,6 +9,19 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 
 
 [See setup section in the readme of the pico-infonesPlus repo on how to install and wire up](https://github.com/fhoedemakers/pico-infonesPlus#pico-setup)
+
+
+> [!WARNING]  
+> **Overclock Notice**  
+>  
+> **Only HSTX based boards like Adafruit Fruit Jam can run the display at 60 Hz.**
+> Boards with no HSTX use the PicoDVI driver, which due to the high overclock, sets the monitor refresh rate to **77.1 Hz**.
+> Some monitors may **not support this refresh rate**, which can cause display or unsupported signal issues.  
+> This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
+>  
+> If you experience problems, try using a **different monitor or TV**.  
+>  
+> **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
 # v0.6 release notes
 
