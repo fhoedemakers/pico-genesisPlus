@@ -46,13 +46,13 @@ Select + Right toggles sound on/off. This increases the emulation speed a bit.
 **Fruit Jam Only** 
   - Button 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
   - SELECT + UP: Toggle scanlines. 
-  - Button 2 (on board) or SELECT + RIGHT: Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
+  - Button 2 (on board): Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
 
 In menu:
 - D-Pad: Move selection.
 - B: Select folder or flash and start rom.
 - A: Go back.
-- Start: load previous flashed rom.
+- Start: shows metadata (if available) for selected rom.
 - Select + dpad up/down change foreground color.
 - Select + dpad left/right background color.
 - Select + B: Saves background and foreground color to config file.
