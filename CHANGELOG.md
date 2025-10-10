@@ -35,7 +35,7 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 
 ## Fixes
 
-- When SD card is prepared on MacOs, the metadata created by MacOs is now ignored. (Hopefully, because I cannot test this myself) 
+- When SD card is prepared on MacOs, the additional metadata files created by MacOs caused several issues. This is fixed now. (Hopefully, because I cannot test this myself) 
 - several small fixes and improvements.
 
 # v0.5 release notes (this is a re-release)
