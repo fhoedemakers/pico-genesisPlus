@@ -40,7 +40,9 @@ To go back to the menu press Select + Start. Genesis mini controller C + Start.
 Start + A toggles the framerate display.
 Start + Dpad up toggles scanlines.
 Select + Right toggles sound on/off. This increases the emulation speed a bit.
+
 ** Pimoroni Pico DV Demo base only **:  Select + Left: Toggles between I2S audio and DVI audio. 
+
 **Fruit Jam Only** 
   - Button 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
   - SELECT + UP: Toggle scanlines. 
