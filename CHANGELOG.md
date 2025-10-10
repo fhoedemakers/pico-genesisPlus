@@ -6,7 +6,7 @@
 
 [Binaries for each configuration and PCB design are at the end of this page](#downloads___).
 
-Only RP2350 supported.
+Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam](https://www.adafruit.com/product/6200)
 
 
 [See setup section in the readme of the pico-infonesPlus repo on how to install and wire up](https://github.com/fhoedemakers/pico-infonesPlus#pico-setup)
