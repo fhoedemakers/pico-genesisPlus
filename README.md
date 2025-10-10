@@ -80,3 +80,12 @@ cd pico-genesisPlus
 git submodule update --init
 ./bld.sh -c1 -2
 ````
+
+Building for the Adafruit [Pico DV Demo Base](https://www.adafruit.com/product/6200)
+
+````bash
+git clone https://github.com/fhoedemakers/pico-genesisPlus.git
+cd pico-genesisPlus
+git submodule update --init
+./bld.sh -c8
+````
