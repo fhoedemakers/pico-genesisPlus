@@ -28,7 +28,7 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 ## Features
 
 - Audio works now, although quality is not good. You can toggle audio on/off with SELECT + RIGHT on the controller. This increases the emulation speed a bit.
-- Metadata support added. Download the metadata from the releases below and extract the zip file to the root of your SD card. This adds game titles and box art to the menu. The screensaver also uses box art images.
+- Metadata support added. Download the [metadata]((https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/GenesisPlusMetadata.zip)) from the releases below and extract the zip file to the root of your SD card. This adds game titles and box art to the menu. The screensaver also uses box art images.
 - Support for [Adafruit Fruit Jam](https://www.adafruit.com/product/6200). This version keeps the monitor at a 60 Hz refresh rate and should work on every monitor. The Fruit Jam has a built-in speaker and a NeoPixel LED strip that can be used as a VU meter.
 - [Pimoroni Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2?variant=42092668289107) support added.
 - When PSRAM is available, roms are loaded from SD card to PSRAM instead of flash. This speads the loading time up a lot.
