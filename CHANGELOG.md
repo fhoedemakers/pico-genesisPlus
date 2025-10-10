@@ -32,6 +32,7 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 - Support for [Adafruit Fruit Jam](https://www.adafruit.com/product/6200). This version keeps the monitor at a 60 Hz refresh rate and should work on every monitor. The Fruit Jam has a built-in speaker and a NeoPixel LED strip that can be used as a VU meter.
 - [Pimoroni Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2?variant=42092668289107) support added.
 - When PSRAM is available, roms are loaded from SD card to PSRAM instead of flash. This speads the loading time up a lot.
+- Uses Pico SDK 2.2.0
 
 ## Fixes
 
