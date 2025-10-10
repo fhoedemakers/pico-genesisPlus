@@ -13,8 +13,14 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for m
 Roms that are to big to load in flash or PSRAM are not listed.
 
 > [!WARNING]  
-> Because of the high overclock, the emulator sets the monitor refresh rate to 77.1 Hz. Some monitors may not support this refresh rate. If you experience problems, try a different monitor or TV.
-> This does not occur on HSTX based boards like Adafruit Fruit Jam, the monitor refresh rate can be set to 60 Hz.
+> **Overclock Notice**  
+>  
+> Due to the high overclock, the emulator sets the monitor refresh rate to **77.1 Hz**.  
+> Some monitors may **not support this refresh rate**, which can cause display issues.  
+>  
+> If you experience problems, try using a **different monitor or TV**.  
+>  
+> **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
 ## Setup
 
