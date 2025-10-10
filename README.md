@@ -15,8 +15,10 @@ Roms that are to big to load in flash or PSRAM are not listed.
 > [!WARNING]  
 > **Overclock Notice**  
 >  
-> Due to the high overclock, the emulator sets the monitor refresh rate to **77.1 Hz**. This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
+> **Only HSTX based boards like Adafruit Fruit Jam can run the display at 60 Hz.**
+> Boards with no HSTX use the PicoDVI driver, which due to the high overclock, sets the monitor refresh rate to **77.1 Hz**.
 > Some monitors may **not support this refresh rate**, which can cause display or unsupported signal issues.  
+> This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
 >  
 > If you experience problems, try using a **different monitor or TV**.  
 >  
