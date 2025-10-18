@@ -23,6 +23,10 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
+# v0.8 release notes
+
+- Game pad fixes for Genesis style USB controllers. See README.
+
 # v0.7 release notes
 
 - Added support for [Retro-Bit Genesis/Megadrive 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb).
