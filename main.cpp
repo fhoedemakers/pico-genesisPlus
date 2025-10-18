@@ -234,7 +234,8 @@ void gwenesis_io_get_buttons()
                 (gp.buttons & io::GamePadState::Button::DOWN ? DOWN : 0) |
                 (gp.buttons & io::GamePadState::Button::A ? A : 0) |
                 (gp.buttons & io::GamePadState::Button::B ? B : 0) |
-                (gp.buttons & io::GamePadState::Button::X ? C : 0) |
+                (gp.buttons & io::GamePadState::Button::X ? C : 0) |   // X button maps to C button on non-genesis controllers
+                (gp.buttons & io::GamePadState::Button::C ? C : 0) |
                 (gp.buttons & io::GamePadState::Button::SELECT ? SELECT : 0) |
                 (gp.buttons & io::GamePadState::Button::START ? START : 0) |
                 0;
@@ -344,8 +345,8 @@ void gwenesis_io_get_buttons()
                           ((v & START) ? 1 << PAD_S : 0) |
                           ((v & A) ? 1 << PAD_A : 0) |
                           ((v & B) ? 1 << PAD_B : 0) |
-                          ((v & C) ? 1 << PAD_C : 0) |
-                          ((v & SELECT) ? 1 << PAD_C : 0);
+                          ((v & C) ? 1 << PAD_C : 0) ;
+                         // ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
 #if ENABLE_VU_METER
         if (isVUMeterToggleButtonPressed())

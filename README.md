@@ -31,16 +31,19 @@ Roms that are to big to load in flash or PSRAM are not listed.
 
 ## Supported controllers and in-game button mapping
 
-- Dual Shock/Dual Sense and PSClassic: Cross: A, Circle: B, Triangle: C
+- Dual Shock/Dual Sense and PSClassic: Cross: A, Circle: B, Triangle: C. **Note** Dual Sense seems not to work on Adafruit Fruit Jam.
 - Xbox style controllers (XInput): A: A, B: B, Y: C
-- Vintage NES controller: B: A, A: B, Select: C
-- ALiExpress SNES USB controller: B: A, A: B, X/Select: C (For this to work, you need to press Y on this controller every time you start a game or boot into the menu) 
-- AliExpres NES USB controller: B: B, A: A, Select: C
-- Genesis Mini 1 and 2 
+- Vintage NES controller: B: A, A: B no C-button
+- ALiExpress SNES USB controller: B: A, A: B, X C (For this to work, you need to press Y on this controller every time you start a game or boot into the menu) 
+- AliExpres NES USB controller: B: A, A: A, No C-button
+- AliExpress SNES USB controller: B: A, A: B, X: C
+- Genesis Mini 1 C button is also SELECT. 
+- Genesis Mini 2 Mode button is SELECT
+- [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
 
 To go back to the menu press Select + Start. Genesis mini controller C + Start.
-Start + A toggles the framerate display.
-Start + Dpad up toggles scanlines.
+Select + A toggles the framerate display.
+Select + Dpad up toggles scanlines.
 Select + Right toggles sound on/off. This increases the emulation speed a bit.
 
 ** Pimoroni Pico DV Demo base only **:  Select + Left: Toggles between I2S audio and DVI audio. 
@@ -60,7 +63,11 @@ In menu:
 - Select + B: Saves background and foreground color to config file.
 - Select + A resets background and foreground color to default.
 
-When using Genesis Mini controller, the C button is used for select.
+In Game:
+
+ - Select + Start: reset to menu
+
+When using Genesis Mini 1 controller (3-button), the C button is used for select. This may interfere with framerate and sound toggle functions.
 
 
 ## Building from source
