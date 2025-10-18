@@ -234,7 +234,8 @@ void gwenesis_io_get_buttons()
                 (gp.buttons & io::GamePadState::Button::DOWN ? DOWN : 0) |
                 (gp.buttons & io::GamePadState::Button::A ? A : 0) |
                 (gp.buttons & io::GamePadState::Button::B ? B : 0) |
-                (gp.buttons & io::GamePadState::Button::X ? C : 0) |
+                (gp.buttons & io::GamePadState::Button::X ? C : 0) |   // X button maps to C button on non-genesis controllers
+                (gp.buttons & io::GamePadState::Button::C ? C : 0) |
                 (gp.buttons & io::GamePadState::Button::SELECT ? SELECT : 0) |
                 (gp.buttons & io::GamePadState::Button::START ? START : 0) |
                 0;
