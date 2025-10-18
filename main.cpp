@@ -345,8 +345,8 @@ void gwenesis_io_get_buttons()
                           ((v & START) ? 1 << PAD_S : 0) |
                           ((v & A) ? 1 << PAD_A : 0) |
                           ((v & B) ? 1 << PAD_B : 0) |
-                          ((v & C) ? 1 << PAD_C : 0) |
-                          ((v & SELECT) ? 1 << PAD_C : 0);
+                          ((v & C) ? 1 << PAD_C : 0) ;
+                         // ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
 #if ENABLE_VU_METER
         if (isVUMeterToggleButtonPressed())
