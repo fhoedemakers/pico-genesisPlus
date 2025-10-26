@@ -256,18 +256,96 @@ void gwenesis_io_get_buttons()
 #endif
 // When USB controller is connected  wiipad acts as controller 2
 #if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
+        uint16_t buttonData = 0;
         if (usbConnected)
         {
             if (i == 1)
             {
-                v |= wiipad_read();
+                buttonData = wiipad_read();
+                // swap A and B buttons
+                if (buttonData & A)
+                {
+                    v |= B;
+                }
+                if (buttonData & B)
+                {
+                    v |= A;
+                }
+                if (buttonData & SELECT)
+                {
+                    v |= SELECT;
+                }
+                if (buttonData & START)
+                {
+                    v |= START;
+                }
+                if (buttonData & UP)
+                {
+                    v |= UP;
+                }
+                if (buttonData & DOWN)
+                {
+                    v |= DOWN;
+                }
+                if (buttonData & LEFT)
+                {
+                    v |= LEFT;      
+                }
+                if (buttonData & RIGHT)
+                {
+                    v |= RIGHT;
+                }
+                if (buttonData & C)
+                {
+                    v |= C;
+                }
             }
         }
         else // if no USB controller is connected, wiipad acts as controller 1
         {
             if (i == 0)
             {
-                v |= wiipad_read();
+                buttonData = wiipad_read();
+                // swap A and B buttons
+                if (buttonData & A)
+                {
+                    //printf("A pressed - swap with B\n");
+                    v |= B;
+                }
+                if (buttonData & B)
+                {
+                    //printf("B pressed - swap with A\n");
+                    v |= A;
+                }
+                if (buttonData & SELECT)
+                {
+                    v |= SELECT;
+                }
+                if (buttonData & START)
+                {
+                    v |= START;
+                }
+                if (buttonData & UP)
+                {
+                    v |= UP;
+                }
+                if (buttonData & DOWN)
+                {
+                    v |= DOWN;
+                }
+                if (buttonData & LEFT)
+                {
+                    v |= LEFT;      
+                }
+                if (buttonData & RIGHT)
+                {
+                    v |= RIGHT;
+                }
+                if (buttonData & C)
+                {
+                    v |= C;
+                }
+                //v |= wiipad_read();
             }
         }
 #endif
