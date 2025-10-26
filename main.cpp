@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
@@ -216,6 +217,39 @@ void toggleScreenMode()
     Frens::toggleScanLines();
 #endif
 }
+
+static inline int mapWiipadButtons(uint16_t buttonData) {
+    int mapped = 0;
+    // swap A and B buttons
+    if (buttonData & A) {
+        mapped |= B;
+    }
+    if (buttonData & B) {
+        mapped |= A;
+    }
+    if (buttonData & SELECT) {
+        mapped |= SELECT;
+    }
+    if (buttonData & START) {
+        mapped |= START;
+    }
+    if (buttonData & UP) {
+        mapped |= UP;
+    }
+    if (buttonData & DOWN) {
+        mapped |= DOWN;
+    }
+    if (buttonData & LEFT) {
+        mapped |= LEFT;
+    }
+    if (buttonData & RIGHT) {
+        mapped |= RIGHT;
+    }
+    if (buttonData & C) {
+        mapped |= C;
+    }
+    return mapped;
+}
 void gwenesis_io_get_buttons()
 {
     char timebuf[10];
@@ -262,43 +296,7 @@ void gwenesis_io_get_buttons()
             if (i == 1)
             {
                 buttonData = wiipad_read();
-                // swap A and B buttons
-                if (buttonData & A)
-                {
-                    v |= B;
-                }
-                if (buttonData & B)
-                {
-                    v |= A;
-                }
-                if (buttonData & SELECT)
-                {
-                    v |= SELECT;
-                }
-                if (buttonData & START)
-                {
-                    v |= START;
-                }
-                if (buttonData & UP)
-                {
-                    v |= UP;
-                }
-                if (buttonData & DOWN)
-                {
-                    v |= DOWN;
-                }
-                if (buttonData & LEFT)
-                {
-                    v |= LEFT;      
-                }
-                if (buttonData & RIGHT)
-                {
-                    v |= RIGHT;
-                }
-                if (buttonData & C)
-                {
-                    v |= C;
-                }
+                v |= mapWiipadButtons(buttonData);
             }
         }
         else // if no USB controller is connected, wiipad acts as controller 1
@@ -306,46 +304,7 @@ void gwenesis_io_get_buttons()
             if (i == 0)
             {
                 buttonData = wiipad_read();
-                // swap A and B buttons
-                if (buttonData & A)
-                {
-                    //printf("A pressed - swap with B\n");
-                    v |= B;
-                }
-                if (buttonData & B)
-                {
-                    //printf("B pressed - swap with A\n");
-                    v |= A;
-                }
-                if (buttonData & SELECT)
-                {
-                    v |= SELECT;
-                }
-                if (buttonData & START)
-                {
-                    v |= START;
-                }
-                if (buttonData & UP)
-                {
-                    v |= UP;
-                }
-                if (buttonData & DOWN)
-                {
-                    v |= DOWN;
-                }
-                if (buttonData & LEFT)
-                {
-                    v |= LEFT;      
-                }
-                if (buttonData & RIGHT)
-                {
-                    v |= RIGHT;
-                }
-                if (buttonData & C)
-                {
-                    v |= C;
-                }
-                //v |= wiipad_read();
+                v |= mapWiipadButtons(buttonData);
             }
         }
 #endif
