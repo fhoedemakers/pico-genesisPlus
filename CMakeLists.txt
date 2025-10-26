@@ -13,7 +13,7 @@ ENDIF(NOT CMAKE_BUILD_TYPE)
 message("* Current build type is : ${CMAKE_BUILD_TYPE}")
 
 if (NOT HW_CONFIG)
-    set(HW_CONFIG 2 CACHE STRING "Select the hardware configuration for your board")      
+    set(HW_CONFIG 8 CACHE STRING "Select the hardware configuration for your board")      
 endif()
 if (NOT USE_HSTX)
     set(USE_HSTX 1 CACHE STRING "Use HSTX for display output when possible")
@@ -70,6 +70,7 @@ target_compile_definitions(${projectname} PUBLIC
     NES_PIO_1=${NES_PIO_1}
     WII_PIN_SDA=${WII_SDA}
     WII_PIN_SCL=${WII_SCL}
+    WIIPAD_DELAYED_START=${WIIPAD_DELAYED_START}
     LED_GPIO_PIN=${LED_GPIO_PIN}
     HW_CONFIG=${HW_CONFIG}
     WIIPAD_I2C=${WIIPAD_I2C}
