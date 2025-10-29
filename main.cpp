@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
@@ -37,8 +36,8 @@ static bool fps_enabled = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
-#define fpsfgcolor 0;     // black
-#define fpsbgcolor 0xFFF; // white
+#define fpsfgcolor 0      // black
+#define fpsbgcolor 0xFFF  // white
 
 #define MARGINTOP 0
 #define MARGINBOTTOM 0
@@ -81,7 +80,10 @@ extern int hint_pending;
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 bool toggleDebugFPS = false;
-
+#if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
+// Cached Wii pad state updated once per frame in ProcessAfterFrameIsRendered()
+static uint16_t wiipad_raw_cached = 0;
+#endif
 #define AUDIOBUFFERSIZE (1024 * 4)
 // Overclock tests:
 // 252000 OK
@@ -173,14 +175,16 @@ int ProcessAfterFrameIsRendered()
 #else
         hstx_getframecounter();
 #endif
-
     auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
     Frens::blinkLed(onOff);
 #if NES_PIN_CLK != -1
-    nespad_read_finish(); // Sets global nespad_state var
+    nespad_read_finish();
 #endif
     tuh_task();
-
+#if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
+    // Poll Wii pad once per frame (function called once per rendered frame)
+    wiipad_raw_cached = wiipad_read();
+#endif
     return count;
 }
 
@@ -290,21 +294,18 @@ void gwenesis_io_get_buttons()
 #endif
 // When USB controller is connected  wiipad acts as controller 2
 #if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
-        uint16_t buttonData = 0;
         if (usbConnected)
         {
             if (i == 1)
             {
-                buttonData = wiipad_read();
-                v |= mapWiipadButtons(buttonData);
+                v |= mapWiipadButtons(wiipad_raw_cached);
             }
         }
-        else // if no USB controller is connected, wiipad acts as controller 1
+        else
         {
             if (i == 0)
             {
-                buttonData = wiipad_read();
-                v |= mapWiipadButtons(buttonData);
+                v |= mapWiipadButtons(wiipad_raw_cached);
             }
         }
 #endif
