@@ -106,11 +106,13 @@ static uint16_t wiipad_raw_cached = 0;
 // seem to be a problem for most monitors, but some monitors may not support this refresh rate
 // We cannot clockdvide the HDMI pixel clock to get exactly 60 Hz. https://github.com/Wren6991/PicoDVI/issues/56
 #define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
+#define VOLTAGE VREG_VOLTAGE_1_30
 #else
 // 340000 Seems to be the highest frequency that works with HSTX. 
 // 378000 would be ideal but is unstable with HSTX
 // We can clock hstx so the display refresh rate remains at 60 Hz.
-#define EMULATOR_CLOCKFREQ_KHZ 340000 // 266000 Overclock frequency in kHz when using HSTX
+#define EMULATOR_CLOCKFREQ_KHZ  378000 //  340000 // 266000 Overclock frequency in kHz when using HSTX
+#define VOLTAGE VREG_VOLTAGE_1_60
 #endif
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
@@ -822,7 +824,7 @@ int main()
     ErrorMessage[0] = selectedRom[0] = 0;
 
     int fileSize = 0;
-    Frens::setClocksAndStartStdio(CPUFreqKHz, VREG_VOLTAGE_1_30);
+    Frens::setClocksAndStartStdio(CPUFreqKHz, VOLTAGE);
 
     printf("==========================================================================================\n");
     printf("Pico-Genesis+ %s\n", SWVERSION);
