@@ -88,6 +88,7 @@ Gamepad buttons:
   - S: START
   - Z: Button1
   - X: Button2
+  - C: Button3
 
 ## Building from source
 
