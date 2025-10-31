@@ -35,11 +35,11 @@ Roms that are to big to load in flash or PSRAM are not listed.
 - Xbox style controllers (XInput)
 - Vintage NES controller: **Note** No C-button
 - ALiExpress SNES USB controller: **Note** To enable B-button you need to press Y on this controller every time you start a game or boot into the menu. 
-- AliExpres NES USB controller: **Note** No C-button
+- AliExpress NES USB controller: **Note** No C-button
 - Genesis Mini 1 C button is also SELECT. (Not ideal)
 - Genesis Mini 2 Mode button is SELECT
 - [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
-- Fruit Jam: SNES Classic/WII classic Pro controllers over I2C. Connect controller to [Adafruit Wii Nunchuck Breakout Adapter - Qwiic / STEMMA QT](https://www.adafruit.com/product/4836)
+- Fruit Jam: SNES Classic/WII classic Pro controllers over I2C. Connect controller to [Adafruit Wii Nunchuck Breakout Adapter - Qwiic / STEMMA QT](https://www.adafruit.com/product/4836). 
 
 
 |     | (S)NES | Genesis | XInput | Dual Shock/Sense | 
