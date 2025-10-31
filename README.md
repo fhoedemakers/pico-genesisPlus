@@ -39,7 +39,8 @@ Roms that are to big to load in flash or PSRAM are not listed.
 - Genesis Mini 1 C button is also SELECT. (Not ideal)
 - Genesis Mini 2 Mode button is SELECT
 - [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
-- Fruit Jam: SNES Classic/WII classic Pro controllers over I2C. Connect controller to [Adafruit Wii Nunchuck Breakout Adapter - Qwiic / STEMMA QT](https://www.adafruit.com/product/4836). 
+- Fruit Jam: SNES Classic/WII classic Pro controllers over I2C. Connect controller to [Adafruit Wii Nunchuck Breakout Adapter - Qwiic / STEMMA QT](https://www.adafruit.com/product/4836).
+- USB Keyboard
 
 
 |     | (S)NES | Genesis | XInput | Dual Shock/Sense | 
