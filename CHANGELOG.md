@@ -27,7 +27,7 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 
 ## Features
 - Fruit Jam: overclock speed set to 378Mhz (was 340 Mhz)
-- When (S)NES classic controller is connected, a W is shoen next to the flash/PSRAM size
+- When (S)NES classic controller is connected, a W is shown next to the flash/PSRAM size
 
 ## Fixes
 
