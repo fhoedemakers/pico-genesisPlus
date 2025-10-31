@@ -33,9 +33,9 @@ Roms that are to big to load in flash or PSRAM are not listed.
 
 - Dual Shock/Dual Sense and PSClassic. **Note** Dual Sense seems not to work on Adafruit Fruit Jam.
 - Xbox style controllers (XInput)
-- Vintage NES controller: **Note** C-button
+- Vintage NES controller: **Note** No C-button
 - ALiExpress SNES USB controller: **Note** To enable B-button you need to press Y on this controller every time you start a game or boot into the menu. 
-- AliExpres NES USB controller: Not ideal, No C-button
+- AliExpres NES USB controller: **Note** No C-button
 - Genesis Mini 1 C button is also SELECT. (Not ideal)
 - Genesis Mini 2 Mode button is SELECT
 - [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
