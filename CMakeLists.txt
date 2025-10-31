@@ -70,6 +70,7 @@ target_compile_definitions(${projectname} PUBLIC
     NES_PIO_1=${NES_PIO_1}
     WII_PIN_SDA=${WII_SDA}
     WII_PIN_SCL=${WII_SCL}
+    WIIPAD_DELAYED_START=${WIIPAD_DELAYED_START}
     LED_GPIO_PIN=${LED_GPIO_PIN}
     HW_CONFIG=${HW_CONFIG}
     WIIPAD_I2C=${WIIPAD_I2C}

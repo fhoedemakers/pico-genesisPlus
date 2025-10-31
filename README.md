@@ -8,6 +8,8 @@ Sound works but its quality is not good. You can disable sound with SELECT + RIG
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
 
+Also games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK) mostly do not work. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
+
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
 Roms that are to big to load in flash or PSRAM are not listed.
@@ -31,44 +33,65 @@ Roms that are to big to load in flash or PSRAM are not listed.
 
 ## Supported controllers and in-game button mapping
 
-- Dual Shock/Dual Sense and PSClassic: Cross: A, Circle: B, Triangle: C. **Note** Dual Sense seems not to work on Adafruit Fruit Jam.
-- Xbox style controllers (XInput): A: A, B: B, Y: C
-- Vintage NES controller: B: A, A: B no C-button
-- ALiExpress SNES USB controller: B: A, A: B, X C (For this to work, you need to press Y on this controller every time you start a game or boot into the menu) 
-- AliExpres NES USB controller: B: A, A: A, No C-button
-- AliExpress SNES USB controller: B: A, A: B, X: C
-- Genesis Mini 1 C button is also SELECT. 
+- Dual Shock/Dual Sense and PSClassic. 
+- Xbox style controllers (XInput)
+- Vintage NES controller: **Note** No C-button
+- ALiExpress SNES USB controller: **Note** To enable B-button you need to press Y on this controller every time you start a game or boot into the menu. 
+- AliExpress NES USB controller: **Note** No C-button
+- Genesis Mini 1 C button is also SELECT. (Not ideal)
 - Genesis Mini 2 Mode button is SELECT
 - [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
+- Fruit Jam: SNES Classic/WII classic Pro controllers over I2C. Connect controller to [Adafruit Wii Nunchuck Breakout Adapter - Qwiic / STEMMA QT](https://www.adafruit.com/product/4836).
+- USB Keyboard
 
-To go back to the menu press Select + Start. Genesis mini controller C + Start.
-Select + A toggles the framerate display.
-Select + Dpad up toggles scanlines.
-Select + Right toggles sound on/off. This increases the emulation speed a bit.
 
-** Pimoroni Pico DV Demo base only **:  Select + Left: Toggles between I2S audio and DVI audio. 
+|     | (S)NES | Genesis | XInput | Dual Shock/Sense | 
+| --- | ------ | ------- | ------ | ---------------- |
+| Button1 | B  |    A    |   A    |    X             |
+| Button2 | A  |    B    |   B    |   Circle         |
+| Button3 | X (SNES only)  |    C    |   Y    |   Triangle       |
+| Select  | select | Mode (C on 3 button controller) | Select | Select     |
 
-**Fruit Jam Only** 
-  - Button 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
+## Menu 
+Gamepad buttons:
+- UP/DOWN: Next/previous item in the menu.
+- LEFT/RIGHT: next/previous page.
+- Button2: Open folder/flash and start game.
+- Button1: Back to parent folder.
+- START: Show [metadata](#using-metadata) and box art (when available)
+
+The colors in the menu can be changed and saved:
+  - SELECT + UP/DOWN changes the foreground color.
+  - SELECT + LEFT/RIGHT changes the background color.
+  - SELECT + Button1 saves the colors. On RP2040, screen will flicker when saved.
+  - SELECT + Button2 resets the colors to default. (Black on white)
+
+When using an USB-Keyboard:
+- Cursor keys: Up, Down, left, right
+- Z: Back to parent folder
+- X: Open Folder/flash and start a game
+- S: Show [metadata](#using-metadata) and box art (when available).
+- A: acts as the select button.
+
+## Emulator (in game)
+Gamepad buttons:
+- SELECT + START, Xbox button: Resets back to the SD Card menu. Game saves are saved to the SD card.
+- SELECT + UP/SELECT + DOWN: switches screen modes.
+- SELECT + Button1/Button2: toggle rapid-fire.
+- START + Button2: Toggle framerate display
+- **Pimoroni Pico DV Demo Base only**: SELECT + LEFT: Switch audio output to the connected speakers on the line-out jack of the Pimoroni Pico DV Demo Base. The speaker setting will be remembered when the emulator is restarted.
+- **Fruit Jam Only** 
+  - pushbutton 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
   - SELECT + UP: Toggle scanlines. 
-  - Button 2 (on board): Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
-
-In menu:
-- D-Pad: Move selection.
-- B: Select folder or flash and start rom.
-- A: Go back.
-- Start: shows metadata (if available) for selected rom.
-- Select + dpad up/down change foreground color.
-- Select + dpad left/right background color.
-- Select + B: Saves background and foreground color to config file.
-- Select + A resets background and foreground color to default.
-
-In Game:
-
- - Select + Start: reset to menu
-
-When using Genesis Mini 1 controller (3-button), the C button is used for select. This may interfere with framerate and sound toggle functions.
-
+  - pushbutton 2 (on board) or SELECT + RIGHT: Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
+- **Genesis Mini Controller**: When using a Genesis Mini controller with 3 buttons, press C for SELECT. 8 buttons Genesis controllers press MODE for SELECT
+- **USB-keyboard**: When using an USB-Keyboard
+  - Cursor keys: up, down, left, right
+  - A: SELECT
+  - S: START
+  - Z: Button1
+  - X: Button2
+  - C: Button3
 
 ## Building from source
 

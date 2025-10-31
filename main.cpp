@@ -36,8 +36,8 @@ static bool fps_enabled = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
-#define fpsfgcolor 0;     // black
-#define fpsbgcolor 0xFFF; // white
+#define fpsfgcolor 0      // black
+#define fpsbgcolor 0xFFF  // white
 
 #define MARGINTOP 0
 #define MARGINBOTTOM 0
@@ -80,34 +80,62 @@ extern int hint_pending;
 int sn76489_index; /* sn78649 audio buffer index */
 int sn76489_clock;
 bool toggleDebugFPS = false;
-
+#if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
+// Cached Wii pad state updated once per frame in ProcessAfterFrameIsRendered()
+static uint16_t wiipad_raw_cached = 0;
+#endif
 #define AUDIOBUFFERSIZE (1024 * 4)
-// Overclock tests:
-// 252000 OK
-// 266000 OK
-// 280000 OK
-// 294000 OK
-// 308000 OK
-// 322000 Panic System clock of %u kHz cannot be exactly achieved
-// 324000 OK
-// 325000 Panic System clock of %u kHz cannot be exactly achieved
-// 326000 Panic System clock of %u kHz cannot be exactly achieved
-// 328000 Not supported signal on samsung tv
-// 330000 Not supported signal on samsung tv
-// 340000 Not supported signal on samsung tv, HSTX works fine
-// 350000 Panic System clock of %u kHz cannot be exactly achieved
-// 360000
-// 378000 Unstable with HSTX
-#if !HSTX
-// NOTE: In PicoDVI, with this overclock the monitor's refresh rate is 77.1 Hz instead of 60 Hz. This does not
-// seem to be a problem for most monitors, but some monitors may not support this refresh rate
-// We cannot clockdvide the HDMI pixel clock to get exactly 60 Hz. https://github.com/Wren6991/PicoDVI/issues/56
-#define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
+/* Core clock experiment log (values in kHz):
+* Stable (video + USB OK):
+*   252000 : Baseline; allows exact 60.00 Hz PicoDVI timing.
+*   266000 : Stable, slight refresh deviation.
+*   280000 : Stable.
+*   294000 : Stable.
+*   308000 : Stable.
+*   324000 : Stable; chosen for PicoDVI build (≈77.2 Hz observed refresh).
+* Unstable / rejected:
+*   322000 : PLL cannot lock exactly (SDK panic: “System clock ... cannot be exactly achieved”).
+*   325000 : Same PLL precision failure.
+*   326000 : Same PLL precision failure.
+*   350000 : Same PLL precision failure.
+* Not supported by specific display (Samsung TV):
+*   328000, 330000, 340000 : TMDS mode not accepted (PicoDVI); HSTX path OK at 340000.
+* Untested / partial:
+*   360000 : Listed; no result logged.
+* HSTX high overclocks:
+*   378000 : Works with HSTX (stable video); supports exact 126 MHz pixel clock for 60.00 Hz.
+* Notes:
+* - “Not supported signal” indicates monitor rejected generated video timing.
+* - “Panic” entries are from clock config failing to derive an exact integer divider chain.
+* - Selected EMULATOR_CLOCKFREQ_KHZ below depends on PicoDVI vs HSTX build.
+*/
+#if !HSTX  // Using PicoDVI
+/* PicoDVI timing note:
+ * For a true 60.00 Hz output the RP2350 system clock must be exactly 252 MHz.
+ * Any deviation changes the derived TMDS / pixel clock and shifts the display refresh rate.
+ *
+ * We overclock to 324 MHz for acceptable emulator performance; at this frequency
+ * the observed monitor refresh becomes ~77.2 Hz instead of 60 Hz. Most displays
+ * tolerate this higher rate, but some may reject the signal.
+ *
+ * The current PicoDVI implementation cannot produce an exact 60 Hz mode at arbitrary
+ * higher core clocks because we lack a suitable integer divisor chain for the pixel clock.
+ * See: https://github.com/Wren6991/PicoDVI/issues/56
+ */
+#define EMULATOR_CLOCKFREQ_KHZ 324000 // Overclock frequency in kHz when using Emulator
+#define VOLTAGE VREG_VOLTAGE_1_30
 #else
-// 340000 Seems to be the highest frequency that works with HSTX. 
-// 378000 would be ideal but is unstable with HSTX
-// We can clock hstx so the display refresh rate remains at 60 Hz.
-#define EMULATOR_CLOCKFREQ_KHZ 340000 // 266000 Overclock frequency in kHz when using HSTX
+/* HSTX overclock notes:
+ * Tested core clocks:
+ *   340000 kHz: Video OK, TinyUSB unstable (PIO USB still works)
+ *   378000 kHz: Stable; allows exact 126 MHz HSTX pixel clock for 60.00 Hz output
+ *
+ * At both tested values the HSTX (serial video) clock can be tuned so display refresh stays 60 Hz.
+ * Debug quirk: At 378 MHz a hard fault (signal trap) may occur when starting a debug session.
+ * Mitigation: Enter BOOTSEL mode before attaching the debugger at 378 MHz.
+ */
+#define EMULATOR_CLOCKFREQ_KHZ  378000 //  Overclock frequency in kHz when using HSTX
+#define VOLTAGE VREG_VOLTAGE_1_60
 #endif
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
@@ -172,14 +200,16 @@ int ProcessAfterFrameIsRendered()
 #else
         hstx_getframecounter();
 #endif
-
     auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
     Frens::blinkLed(onOff);
 #if NES_PIN_CLK != -1
-    nespad_read_finish(); // Sets global nespad_state var
+    nespad_read_finish();
 #endif
     tuh_task();
-
+#if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
+    // Poll Wii pad once per frame (function called once per rendered frame)
+    wiipad_raw_cached = wiipad_read();
+#endif
     return count;
 }
 
@@ -215,6 +245,39 @@ void toggleScreenMode()
 #else
     Frens::toggleScanLines();
 #endif
+}
+
+static inline int mapWiipadButtons(uint16_t buttonData) {
+    int mapped = 0;
+    // swap A and B buttons
+    if (buttonData & A) {
+        mapped |= B;
+    }
+    if (buttonData & B) {
+        mapped |= A;
+    }
+    if (buttonData & SELECT) {
+        mapped |= SELECT;
+    }
+    if (buttonData & START) {
+        mapped |= START;
+    }
+    if (buttonData & UP) {
+        mapped |= UP;
+    }
+    if (buttonData & DOWN) {
+        mapped |= DOWN;
+    }
+    if (buttonData & LEFT) {
+        mapped |= LEFT;
+    }
+    if (buttonData & RIGHT) {
+        mapped |= RIGHT;
+    }
+    if (buttonData & C) {
+        mapped |= C;
+    }
+    return mapped;
 }
 void gwenesis_io_get_buttons()
 {
@@ -260,14 +323,14 @@ void gwenesis_io_get_buttons()
         {
             if (i == 1)
             {
-                v |= wiipad_read();
+                v |= mapWiipadButtons(wiipad_raw_cached);
             }
         }
-        else // if no USB controller is connected, wiipad acts as controller 1
+        else
         {
             if (i == 0)
             {
-                v |= wiipad_read();
+                v |= mapWiipadButtons(wiipad_raw_cached);
             }
         }
 #endif
@@ -784,7 +847,7 @@ int main()
     ErrorMessage[0] = selectedRom[0] = 0;
 
     int fileSize = 0;
-    Frens::setClocksAndStartStdio(CPUFreqKHz, VREG_VOLTAGE_1_30);
+    Frens::setClocksAndStartStdio(CPUFreqKHz, VOLTAGE);
 
     printf("==========================================================================================\n");
     printf("Pico-Genesis+ %s\n", SWVERSION);
