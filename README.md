@@ -8,7 +8,7 @@ Sound works but its quality is not good. You can disable sound with SELECT + RIG
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
 
-Also games developed with the popular SGDK mostly do not work. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
+Also games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK) mostly do not work. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
