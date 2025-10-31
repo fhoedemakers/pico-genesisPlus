@@ -31,7 +31,7 @@ Roms that are to big to load in flash or PSRAM are not listed.
 
 ## Supported controllers and in-game button mapping
 
-- Dual Shock/Dual Sense and PSClassic. **Note** Dual Sense seems not to work on Adafruit Fruit Jam.
+- Dual Shock/Dual Sense and PSClassic. 
 - Xbox style controllers (XInput)
 - Vintage NES controller: **Note** No C-button
 - ALiExpress SNES USB controller: **Note** To enable B-button you need to press Y on this controller every time you start a game or boot into the menu. 
