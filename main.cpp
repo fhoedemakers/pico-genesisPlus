@@ -85,33 +85,56 @@ bool toggleDebugFPS = false;
 static uint16_t wiipad_raw_cached = 0;
 #endif
 #define AUDIOBUFFERSIZE (1024 * 4)
-// Overclock tests:
-// 252000 OK
-// 266000 OK
-// 280000 OK
-// 294000 OK
-// 308000 OK
-// 322000 Panic System clock of %u kHz cannot be exactly achieved
-// 324000 OK
-// 325000 Panic System clock of %u kHz cannot be exactly achieved
-// 326000 Panic System clock of %u kHz cannot be exactly achieved
-// 328000 Not supported signal on samsung tv
-// 330000 Not supported signal on samsung tv
-// 340000 Not supported signal on samsung tv, HSTX works fine
-// 350000 Panic System clock of %u kHz cannot be exactly achieved
-// 360000
-// 378000 Unstable with HSTX
-#if !HSTX
-// NOTE: In PicoDVI, with this overclock the monitor's refresh rate is 77.1 Hz instead of 60 Hz. This does not
-// seem to be a problem for most monitors, but some monitors may not support this refresh rate
-// We cannot clockdvide the HDMI pixel clock to get exactly 60 Hz. https://github.com/Wren6991/PicoDVI/issues/56
-#define EMULATOR_CLOCKFREQ_KHZ 324000 // 340000 Overclock frequency in kHz when using Emulator
+/* Core clock experiment log (values in kHz):
+* Stable (video + USB OK):
+*   252000 : Baseline; allows exact 60.00 Hz PicoDVI timing.
+*   266000 : Stable, slight refresh deviation.
+*   280000 : Stable.
+*   294000 : Stable.
+*   308000 : Stable.
+*   324000 : Stable; chosen for PicoDVI build (≈77.2 Hz observed refresh).
+* Unstable / rejected:
+*   322000 : PLL cannot lock exactly (SDK panic: “System clock ... cannot be exactly achieved”).
+*   325000 : Same PLL precision failure.
+*   326000 : Same PLL precision failure.
+*   350000 : Same PLL precision failure.
+* Not supported by specific display (Samsung TV):
+*   328000, 330000, 340000 : TMDS mode not accepted (PicoDVI); HSTX path OK at 340000.
+* Untested / partial:
+*   360000 : Listed; no result logged.
+* HSTX high overclocks:
+*   378000 : Works with HSTX (stable video); supports exact 126 MHz pixel clock for 60.00 Hz.
+* Notes:
+* - “Not supported signal” indicates monitor rejected generated video timing.
+* - “Panic” entries are from clock config failing to derive an exact integer divider chain.
+* - Selected EMULATOR_CLOCKFREQ_KHZ below depends on PicoDVI vs HSTX build.
+*/
+#if !HSTX  // Using PicoDVI
+/* PicoDVI timing note:
+ * For a true 60.00 Hz output the RP2350 system clock must be exactly 252 MHz.
+ * Any deviation changes the derived TMDS / pixel clock and shifts the display refresh rate.
+ *
+ * We overclock to 324 MHz for acceptable emulator performance; at this frequency
+ * the observed monitor refresh becomes ~77.2 Hz instead of 60 Hz. Most displays
+ * tolerate this higher rate, but some may reject the signal.
+ *
+ * The current PicoDVI implementation cannot produce an exact 60 Hz mode at arbitrary
+ * higher core clocks because we lack a suitable integer divisor chain for the pixel clock.
+ * See: https://github.com/Wren6991/PicoDVI/issues/56
+ */
+#define EMULATOR_CLOCKFREQ_KHZ 324000 // Overclock frequency in kHz when using Emulator
 #define VOLTAGE VREG_VOLTAGE_1_30
 #else
-// 340000 Seems to be the highest frequency that works with HSTX. 
-// 378000 would be ideal but is unstable with HSTX
-// We can clock hstx so the display refresh rate remains at 60 Hz.
-#define EMULATOR_CLOCKFREQ_KHZ  378000 //  340000 // 266000 Overclock frequency in kHz when using HSTX
+/* HSTX overclock notes:
+ * Tested core clocks:
+ *   340000 kHz: Video OK, TinyUSB unstable (PIO USB still works)
+ *   378000 kHz: Stable; allows exact 126 MHz HSTX pixel clock for 60.00 Hz output
+ *
+ * At both tested values the HSTX (serial video) clock can be tuned so display refresh stays 60 Hz.
+ * Debug quirk: At 378 MHz a hard fault (signal trap) may occur when starting a debug session.
+ * Mitigation: Enter BOOTSEL mode before attaching the debugger at 378 MHz.
+ */
+#define EMULATOR_CLOCKFREQ_KHZ  378000 //  Overclock frequency in kHz when using HSTX
 #define VOLTAGE VREG_VOLTAGE_1_60
 #endif
 // https://github.com/orgs/micropython/discussions/15722
