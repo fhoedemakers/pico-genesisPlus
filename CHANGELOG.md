@@ -23,6 +23,17 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
+# v0.9 release notes
+
+## Features
+- Fruit Jam: overclock speed set to 378Mhz (was 340 Mhz)
+- When (S)NES classic controller is connected, a W is shoen next to the flash/PSRAM size
+
+## Fixes
+
+- Fixed not properly working SNES Classic/WII Pro I2C controller. (NES Classic I2C always worked fine). 
+- Fruit Jam: Initialisation of (S)NES classic/WII Pro I2C controller will now take place after DAC is initialized. [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/10). You need to plug-in the controller **after** the intro screen is shown. In case the controller is connected and the DAC fails to initialize, an error screen is shown.
+
 # v0.8 release notes
 
 - Game pad fixes for Genesis style USB controllers. See README.
