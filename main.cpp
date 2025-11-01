@@ -32,7 +32,7 @@ bool isFatalError = false;
 static FATFS fs;
 char *romName;
 
-static bool fps_enabled = false;
+static bool fps_enabled = true;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
@@ -209,6 +209,15 @@ int ProcessAfterFrameIsRendered()
 #if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
     // Poll Wii pad once per frame (function called once per rendered frame)
     wiipad_raw_cached = wiipad_read();
+#endif
+#if ENABLE_VU_METER
+        if (isVUMeterToggleButtonPressed())
+        {
+            settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
+            Frens::savesettings();
+            // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
+            turnOffAllLeds();
+        }
 #endif
     return count;
 }
@@ -411,15 +420,7 @@ void gwenesis_io_get_buttons()
                           ((v & C) ? 1 << PAD_C : 0) ;
                          // ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
-#if ENABLE_VU_METER
-        if (isVUMeterToggleButtonPressed())
-        {
-            settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-            Frens::savesettings();
-            // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
-            turnOffAllLeds();
-        }
-#endif
+
     }
 }
 
@@ -594,6 +595,8 @@ void __not_in_flash_func(emulate)()
     unsigned int old_screen_width = 0;
     unsigned int old_screen_height = 0;
     char tbuf[32];
+    // Improved FPS limiter: fixed timestep, no drift
+    uint64_t next_frame_time = 0;
     while (!reboot)
     {
         /* Eumulator loop */
@@ -783,16 +786,14 @@ void __not_in_flash_func(emulate)()
 
         if (limit_fps)
         {
-            frame_cnt++;
-            if (frame_cnt == (is_pal ? 5 : 6))
+            const uint64_t frame_period = is_pal ? 20000 : 16666; // microseconds per frame
+            if (next_frame_time == 0)
+                next_frame_time = time_us_64();
+            while ((int64_t)(next_frame_time + frame_period - time_us_64()) > 0)
             {
-                while (time_us_64() - frame_timer_start < (is_pal ? 20000 * 5 : 16666 * 6))
-                {
-                    busy_wait_at_least_cycles(10);
-                }; // 60 Hz
-                frame_timer_start = time_us_64();
-                frame_cnt = 0;
+                busy_wait_at_least_cycles(10);
             }
+            next_frame_time += frame_period;
         }
         if (audio_enabled)
         {
