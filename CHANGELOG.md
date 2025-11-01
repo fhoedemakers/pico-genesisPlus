@@ -23,6 +23,12 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
+# v0.10 Release notes
+
+## Fixes
+- Improved FPS limiter: now uses a fixed timestep approach and initializes timing at the start of emulation, ensuring stable frame rate from the first frame and correct behavior when emulator is overloaded.
+- Fruit Jam: Check VU-Meter toggle only once per frame in stead of multiple times per frame.
+
 # v0.9 release notes
 
 ## Features
