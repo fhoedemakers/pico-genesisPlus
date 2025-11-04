@@ -249,7 +249,7 @@ void toggleScreenMode()
     {
         settings.screenMode = ScreenMode::SCANLINE_1_1;
     }
-    Frens::savesettings();
+    FrensSettings::savesettings();
     Frens::applyScreenMode(settings.screenMode);
 #else
     Frens::toggleScanLines();
@@ -391,7 +391,7 @@ void gwenesis_io_get_buttons()
 #else
                 settings.flags.useExtAudio = 0;
 #endif
-                Frens::savesettings();
+                FrensSettings::savesettings();
             }
             else if (pushed & RIGHT)
             {
@@ -861,7 +861,7 @@ int main()
     printf("Stack size: %d bytes\n", PICO_STACK_SIZE);
     printf("==========================================================================================\n");
     printf("Starting up...\n");
-
+    FrensSettings::initSettings(FrensSettings::emulators::GENESIS);
     isFatalError = !Frens::initAll(selectedRom, CPUFreqKHz, MARGINTOP, MARGINBOTTOM, AUDIOBUFFERSIZE, true, true);
 #if !HSTX
     scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
@@ -880,7 +880,7 @@ int main()
         if (settings.screenMode != ScreenMode::SCANLINE_1_1 && settings.screenMode != ScreenMode::NOSCANLINE_1_1)
         {
             settings.screenMode = ScreenMode::SCANLINE_1_1;
-            Frens::savesettings();
+            FrensSettings::savesettings();
         }
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
 #endif
