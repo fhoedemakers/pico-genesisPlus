@@ -2,7 +2,7 @@
 
 A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display. Works best with [Adafruit Fruitjam](https://www.adafruit.com/product/6200)
 
-Create a FAT32 or exFAT formatted SD card and copy your NES roms and optional metadata on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
+Create a FAT32 or exFAT formatted SD card and copy your NES roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
 
 Sound works but its quality is not good. You can disable sound with SELECT + RIGHT on the controller.
 
@@ -92,6 +92,12 @@ Gamepad buttons:
   - Z: Button1
   - X: Button2
   - C: Button3
+
+## Using metadata.
+
+Download the metadata pack from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/GenesisPlusMetadata.zip) and extract its contents to the root of the SD card. It contains box art and game info for many games. The metadata is used in the menu to show box art and game info when a rom is selected. Press START to view the information. When the screensaver is started, random box art is shown.
+
+<img width="1920" height="1080" alt="Screenshot 2025-11-07 06-00-18" src="https://github.com/user-attachments/assets/2d9a7663-1ea2-46b4-81d9-70c8f7478b5f" />
 
 ## Building from source
 
