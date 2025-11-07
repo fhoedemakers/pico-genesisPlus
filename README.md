@@ -12,7 +12,7 @@ Also games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK)
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
-Roms that are to big to load in flash or PSRAM are not listed.
+Roms that are too big to load in flash or PSRAM are not listed.
 
 > [!WARNING]  
 > **Overclock Notice**  
