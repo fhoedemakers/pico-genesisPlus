@@ -415,15 +415,24 @@ void gwenesis_io_get_buttons()
 #endif
                 FrensSettings::savesettings();
             }
+            // else if (pushed & RIGHT)
+            // {
+            //     settings.flags.audioEnabled = !settings.flags.audioEnabled;
+            //     audio_enabled = settings.flags.audioEnabled;  // Needed to keep external audio_enabled variable in sync
+            //     //audio_enabled = !audio_enabled;
+            //     //frameskip = audio_enabled;
+            //     printf("Audio %s, Frameskip %s\n", settings.flags.audioEnabled ? "enabled" : "disabled", settings.flags.frameSkip ? "enabled" : "disabled");
+            //     FrensSettings::savesettings();
+            // }
+#if ENABLE_VU_METER
             else if (pushed & RIGHT)
             {
-                settings.flags.audioEnabled = !settings.flags.audioEnabled;
-                audio_enabled = settings.flags.audioEnabled;  // Needed to keep external audio_enabled variable in sync
-                //audio_enabled = !audio_enabled;
-                //frameskip = audio_enabled;
-                printf("Audio %s, Frameskip %s\n", settings.flags.audioEnabled ? "enabled" : "disabled", settings.flags.frameSkip ? "enabled" : "disabled");
+                settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
                 FrensSettings::savesettings();
+                // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
+                turnOffAllLeds();
             }
+#endif
         }
         if (p1 & START)
         {
