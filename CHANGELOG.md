@@ -32,6 +32,7 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 ## Fixes
 - Improved FPS limiter: now uses a fixed timestep approach and initializes timing at the start of emulation, ensuring stable frame rate from the first frame and correct behavior when emulator is overloaded.
 - Fruit Jam: Check VU-Meter toggle only once per frame in stead of multiple times per frame.
+- Fruit Jam: In game SELECT + RIGHT to toggle VU-Meter now works properly. 
 
 # v0.9 release notes
 
