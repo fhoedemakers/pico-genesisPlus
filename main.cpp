@@ -13,7 +13,7 @@
 #include "settings.h"
 #include "FrensFonts.h"
 #include "vumeter.h"
-
+#include "menu_settings.h"
 /* Gwenesis Emulator */
 extern "C"
 {
@@ -32,7 +32,6 @@ bool isFatalError = false;
 static FATFS fs;
 char *romName;
 
-static bool fps_enabled = true;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
@@ -68,7 +67,7 @@ int frame_timer_start = 0;
 bool limit_fps = true; // was true
 
 int audio_enabled = 1;          // Set to 1 to enable audio. Now disabled because its is not properly working.
-bool frameskip = audio_enabled; // was true
+// bool frameskip = audio_enabled; // was true
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 1;
 
@@ -139,7 +138,31 @@ static uint16_t wiipad_raw_cached = 0;
 #endif
 // https://github.com/orgs/micropython/discussions/15722
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
-
+// Visibility configuration for options menu (NES specific)
+// 1 = show option line, 0 = hide.
+// Order must match enum in menu_options.h
+const uint8_t g_settings_visibility[MOPT_COUNT] = {
+    !HSTX, // Screen Mode (only when not HSTX)
+    HSTX,  // Scanlines toggle (only when HSTX)
+    1, // FPS Overlay
+    1, // Audio Enable
+    1, // Frame Skip
+    (EXT_AUDIO_IS_ENABLED && !HSTX), // External Audio
+    1, // Font Color
+    1, // Font Back Color
+    ENABLE_VU_METER, // VU Meter
+    (HW_CONFIG == 8),  // Fruit Jam Internal Speaker
+    0, // DMG Palette (Genesis emulator does not use GameBoy palettes)
+    0, // Border Mode (Super Gameboy style borders not applicable for Genesis)
+   
+   
+};
+const uint8_t g_available_screen_modes[] = {
+        0,   // SCANLINE_8_7, 
+        0,  // NOSCANLINE_8_7
+        1,  // SCANLINE_1_1,
+        1   //NOSCANLINE_1_1
+};
 #if 0
 int sampleIndex = 0;
 void __not_in_flash_func(processaudio)(int line)
@@ -214,7 +237,7 @@ int ProcessAfterFrameIsRendered()
         if (isVUMeterToggleButtonPressed())
         {
             settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-            Frens::savesettings();
+            FrensSettings::savesettings();
             // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
             turnOffAllLeds();
         }
@@ -393,20 +416,33 @@ void gwenesis_io_get_buttons()
 #endif
                 FrensSettings::savesettings();
             }
+            // else if (pushed & RIGHT)
+            // {
+            //     settings.flags.audioEnabled = !settings.flags.audioEnabled;
+            //     audio_enabled = settings.flags.audioEnabled;  // Needed to keep external audio_enabled variable in sync
+            //     //audio_enabled = !audio_enabled;
+            //     //frameskip = audio_enabled;
+            //     printf("Audio %s, Frameskip %s\n", settings.flags.audioEnabled ? "enabled" : "disabled", settings.flags.frameSkip ? "enabled" : "disabled");
+            //     FrensSettings::savesettings();
+            // }
+#if ENABLE_VU_METER
             else if (pushed & RIGHT)
             {
-                audio_enabled = !audio_enabled;
-                frameskip = audio_enabled;
-                printf("Audio %s, Frameskip %s\n", audio_enabled ? "enabled" : "disabled", frameskip ? "enabled" : "disabled");
+                settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
+                FrensSettings::savesettings();
+                // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
+                turnOffAllLeds();
             }
+#endif
         }
         if (p1 & START)
         {
             // Toggle frame rate display
             if (pushed & A)
             {
-                fps_enabled = !fps_enabled;
-                printf("FPS: %s\n", fps_enabled ? "ON" : "OFF");
+                settings.flags.displayFrameRate = !settings.flags.displayFrameRate;
+                printf("FPS: %s\n", settings.flags.displayFrameRate ? "ON" : "OFF");
+                FrensSettings::savesettings();
             }
         }
         prevButtons[i] = v;
@@ -610,7 +646,7 @@ void __not_in_flash_func(emulate)()
         if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
         {
             // printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame);
-            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d, audio_enabled: %d, frameskip: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame, audio_enabled, frameskip);
+            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d, audio_enabled: %d, frameskip: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame, settings.flags.audioEnabled, settings.flags.frameSkip);
             firstLoop = false;
             old_screen_height = screen_height;
             old_screen_width = screen_width;
@@ -713,7 +749,7 @@ void __not_in_flash_func(emulate)()
                         memset(dst, 0, tail * sizeof(uint16_t));
                     }
 #endif
-                    if (fps_enabled && scan_line >= FPSSTART && scan_line < FPSEND)
+                    if (settings.flags.displayFrameRate && scan_line >= FPSSTART && scan_line < FPSEND)
                     {
                         WORD *fpsBuffer = currentLineBuf + 5;
                         int rowInChar = scan_line % 8;
@@ -774,7 +810,7 @@ void __not_in_flash_func(emulate)()
             {
                 z80_irq_line(0);
                 // FRAMESKIP every 3rd frame
-                drawFrame = !frameskip || (frame % 3 != 0);
+                drawFrame = !settings.flags.frameSkip || (frame % 3 != 0);
             }
 
             system_clock += VDP_CYCLES_PER_LINE;
@@ -795,7 +831,7 @@ void __not_in_flash_func(emulate)()
             }
             next_frame_time += frame_period;
         }
-        if (audio_enabled)
+        if (settings.flags.audioEnabled)
         {
             //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
             output_audio_per_frame();
@@ -816,7 +852,7 @@ void __not_in_flash_func(emulate)()
         // gwenesis_sound_submit();
 
         // calculate framerate
-        if (fps_enabled)
+        if (settings.flags.displayFrameRate)
         {
             uint64_t tick_us = Frens::time_us() - start_tick_us;
             if (tick_us > 1000000)
@@ -888,7 +924,8 @@ int main()
         reset = false;
 
         abSwapped = 0; // don't swap A and B buttons
-
+        audio_enabled = settings.flags.audioEnabled;
+        EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
         memset(palette, 0, sizeof(palette));
         printf("Starting game\n");
         init_emulator_mem();
