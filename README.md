@@ -4,7 +4,7 @@ A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads r
 
 Create a FAT32 or exFAT formatted SD card and copy your NES roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
 
-Sound works but its quality is not good. You can disable sound with SELECT + RIGHT on the controller.
+Audio works, but quality is currently poor. When audio is enabled the emulator uses frame skipping to maintain performance. You can also enable or disable frame skip in the Settings menu. (Press SELECT in the menu to open the settings screen)
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
 
@@ -14,17 +14,12 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for m
 
 Roms that are too big to load in flash or PSRAM are not listed.
 
-> [!WARNING]  
-> **Overclock Notice**  
->  
-> **Only HSTX based boards like Adafruit Fruit Jam work on every monitor!**
-> Boards with no HSTX use the PicoDVI driver, which due to the high overclock, sets the monitor refresh rate to **77.1 Hz**.
-> Some monitors may **not support this refresh rate**, which can cause display or unsupported signal issues.  
+> [!WARNING]
+> **Only HSTX boards (e.g. Adafruit Fruit Jam) deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
+> The high refresh rate on non-HSTX boards is related to the high overclocking of the RP2350.
 > This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
->  
 > If you experience problems, try using a **different monitor or TV**.  
->  
-> **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
+
 
 ## Setup
 
@@ -59,12 +54,7 @@ Gamepad buttons:
 - Button2: Open folder/flash and start game.
 - Button1: Back to parent folder.
 - START: Show [metadata](#using-metadata) and box art (when available)
-
-The colors in the menu can be changed and saved:
-  - SELECT + UP/DOWN changes the foreground color.
-  - SELECT + LEFT/RIGHT changes the background color.
-  - SELECT + Button1 saves the colors. On RP2040, screen will flicker when saved.
-  - SELECT + Button2 resets the colors to default. (Black on white)
+- SELECT: Opens a setting menu. Here you can change settings like screen mode, scanlines, framerate display, menu colors and other board specific settings. Settings can also be changed in-game by pressing some button combinations as explained below.
 
 When using an USB-Keyboard:
 - Cursor keys: Up, Down, left, right
@@ -81,8 +71,8 @@ Gamepad buttons:
 - START + Button2: Toggle framerate display
 - **Pimoroni Pico DV Demo Base only**: SELECT + LEFT: Switch audio output to the connected speakers on the line-out jack of the Pimoroni Pico DV Demo Base. The speaker setting will be remembered when the emulator is restarted.
 - **Fruit Jam Only** 
-  - pushbutton 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
   - SELECT + UP: Toggle scanlines. 
+  - pushbutton 1 (on board): Mute audio of built-in speaker. Audio is still outputted to the audio jack.
   - pushbutton 2 (on board) or SELECT + RIGHT: Toggles the VU meter on or off. (NeoPixel LEDs light up in sync with the music rhythm)
 - **Genesis Mini Controller**: When using a Genesis Mini controller with 3 buttons, press C for SELECT. 8 buttons Genesis controllers press MODE for SELECT
 - **USB-keyboard**: When using an USB-Keyboard
