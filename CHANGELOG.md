@@ -27,7 +27,9 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 
 ## Features
 
-- Each emulator now has a different settings file
+- Settings are saved to /settings_md.dat instead of /settings.dat. This allows to have separate settings files for different emulators (e.g. pico-infonesPlus and pico-peanutGB etc.).
+- Added a settings menu. Press SELECT in the main menu to open it and change settings instead of using in‑game button combos.
+- Switched to Fatfs R0.16.
 
 ## Fixes
 - Improved FPS limiter: now uses a fixed timestep approach and initializes timing at the start of emulation, ensuring stable frame rate from the first frame and correct behavior when emulator is overloaded.
