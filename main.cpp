@@ -31,12 +31,12 @@ extern "C"
 bool isFatalError = false;
 static FATFS fs;
 char *romName;
-
+bool showSettings = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static char fpsString[4] = "000";
-#define fpsfgcolor 0      // black
-#define fpsbgcolor 0xFFF  // white
+#define fpsfgcolor 0     // black
+#define fpsbgcolor 0xFFF // white
 
 #define MARGINTOP 0
 #define MARGINBOTTOM 0
@@ -65,8 +65,9 @@ int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = true; // was true
-
-int audio_enabled = 1;          // Set to 1 to enable audio. Now disabled because its is not properly working.
+ // Improved FPS limiter: fixed timestep, no drift
+static uint64_t next_frame_time = 0;
+int audio_enabled = 1; // Set to 1 to enable audio. Now disabled because its is not properly working.
 // bool frameskip = audio_enabled; // was true
 bool sn76489_enabled = true;
 uint8_t snd_accurate = 1;
@@ -85,30 +86,30 @@ static uint16_t wiipad_raw_cached = 0;
 #endif
 #define AUDIOBUFFERSIZE (1024 * 4)
 /* Core clock experiment log (values in kHz):
-* Stable (video + USB OK):
-*   252000 : Baseline; allows exact 60.00 Hz PicoDVI timing.
-*   266000 : Stable, slight refresh deviation.
-*   280000 : Stable.
-*   294000 : Stable.
-*   308000 : Stable.
-*   324000 : Stable; chosen for PicoDVI build (≈77.2 Hz observed refresh).
-* Unstable / rejected:
-*   322000 : PLL cannot lock exactly (SDK panic: “System clock ... cannot be exactly achieved”).
-*   325000 : Same PLL precision failure.
-*   326000 : Same PLL precision failure.
-*   350000 : Same PLL precision failure.
-* Not supported by specific display (Samsung TV):
-*   328000, 330000, 340000 : TMDS mode not accepted (PicoDVI); HSTX path OK at 340000.
-* Untested / partial:
-*   360000 : Listed; no result logged.
-* HSTX high overclocks:
-*   378000 : Works with HSTX (stable video); supports exact 126 MHz pixel clock for 60.00 Hz.
-* Notes:
-* - “Not supported signal” indicates monitor rejected generated video timing.
-* - “Panic” entries are from clock config failing to derive an exact integer divider chain.
-* - Selected EMULATOR_CLOCKFREQ_KHZ below depends on PicoDVI vs HSTX build.
-*/
-#if !HSTX  // Using PicoDVI
+ * Stable (video + USB OK):
+ *   252000 : Baseline; allows exact 60.00 Hz PicoDVI timing.
+ *   266000 : Stable, slight refresh deviation.
+ *   280000 : Stable.
+ *   294000 : Stable.
+ *   308000 : Stable.
+ *   324000 : Stable; chosen for PicoDVI build (≈77.2 Hz observed refresh).
+ * Unstable / rejected:
+ *   322000 : PLL cannot lock exactly (SDK panic: “System clock ... cannot be exactly achieved”).
+ *   325000 : Same PLL precision failure.
+ *   326000 : Same PLL precision failure.
+ *   350000 : Same PLL precision failure.
+ * Not supported by specific display (Samsung TV):
+ *   328000, 330000, 340000 : TMDS mode not accepted (PicoDVI); HSTX path OK at 340000.
+ * Untested / partial:
+ *   360000 : Listed; no result logged.
+ * HSTX high overclocks:
+ *   378000 : Works with HSTX (stable video); supports exact 126 MHz pixel clock for 60.00 Hz.
+ * Notes:
+ * - “Not supported signal” indicates monitor rejected generated video timing.
+ * - “Panic” entries are from clock config failing to derive an exact integer divider chain.
+ * - Selected EMULATOR_CLOCKFREQ_KHZ below depends on PicoDVI vs HSTX build.
+ */
+#if !HSTX // Using PicoDVI
 /* PicoDVI timing note:
  * For a true 60.00 Hz output the RP2350 system clock must be exactly 252 MHz.
  * Any deviation changes the derived TMDS / pixel clock and shifts the display refresh rate.
@@ -133,7 +134,7 @@ static uint16_t wiipad_raw_cached = 0;
  * Debug quirk: At 378 MHz a hard fault (signal trap) may occur when starting a debug session.
  * Mitigation: Enter BOOTSEL mode before attaching the debugger at 378 MHz.
  */
-#define EMULATOR_CLOCKFREQ_KHZ  378000 //  Overclock frequency in kHz when using HSTX
+#define EMULATOR_CLOCKFREQ_KHZ 378000 //  Overclock frequency in kHz when using HSTX
 #define VOLTAGE VREG_VOLTAGE_1_60
 #endif
 // https://github.com/orgs/micropython/discussions/15722
@@ -142,26 +143,28 @@ static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 // 1 = show option line, 0 = hide.
 // Order must match enum in menu_options.h
 const uint8_t g_settings_visibility[MOPT_COUNT] = {
-    !HSTX, // Screen Mode (only when not HSTX)
-    HSTX,  // Scanlines toggle (only when HSTX)
-    1, // FPS Overlay
-    1, // Audio Enable
-    1, // Frame Skip
+    0,                               // Exit Game, or back to menu. Always visible when in-game.
+    !HSTX,                           // Screen Mode (only when not HSTX)
+    HSTX,                            // Scanlines toggle (only when HSTX)
+    1,                               // FPS Overlay
+    1,                               // Audio Enable
+    1,                               // Frame Skip
     (EXT_AUDIO_IS_ENABLED && !HSTX), // External Audio
-    1, // Font Color
-    1, // Font Back Color
-    ENABLE_VU_METER, // VU Meter
-    (HW_CONFIG == 8),  // Fruit Jam Internal Speaker
-    0, // DMG Palette (Genesis emulator does not use GameBoy palettes)
-    0, // Border Mode (Super Gameboy style borders not applicable for Genesis)
-   
-   
+    1,                               // Font Color
+    1,                               // Font Back Color
+    ENABLE_VU_METER,                 // VU Meter
+    (HW_CONFIG == 8),                // Fruit Jam Internal Speaker
+    0,                               // DMG Palette (Genesis emulator does not use GameBoy palettes)
+    0,                               // Border Mode (Super Gameboy style borders not applicable for Genesis)
+    0,                               // Rapid Fire on A (not applicable)
+    0                                // Rapid Fire on B (not applicable)
+
 };
 const uint8_t g_available_screen_modes[] = {
-        0,   // SCANLINE_8_7, 
-        0,  // NOSCANLINE_8_7
-        1,  // SCANLINE_1_1,
-        1   //NOSCANLINE_1_1
+    0, // SCANLINE_8_7,
+    0, // NOSCANLINE_8_7
+    1, // SCANLINE_1_1,
+    1  // NOSCANLINE_1_1
 };
 #if 0
 int sampleIndex = 0;
@@ -234,14 +237,30 @@ int ProcessAfterFrameIsRendered()
     wiipad_raw_cached = wiipad_read();
 #endif
 #if ENABLE_VU_METER
-        if (isVUMeterToggleButtonPressed())
-        {
-            settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-            FrensSettings::savesettings();
-            // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
-            turnOffAllLeds();
-        }
+    if (isVUMeterToggleButtonPressed())
+    {
+        settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
+        FrensSettings::savesettings();
+        // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
+        turnOffAllLeds();
+    }
 #endif
+ if (showSettings)
+    {
+        int rval = showSettingsMenu(true);
+        if (rval == 3)
+        {
+            reboot = true;
+        }
+        showSettings = false;
+        // Speaker can be muted/unmuted from settings menu
+        EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
+        // audio_enabled may be changed from settings menu
+        audio_enabled = settings.flags.audioEnabled;
+        // avoid frame rate spike after settings menu
+        //Frens::PaceFrames60fps(true);
+        next_frame_time = 0;
+    }
     return count;
 }
 
@@ -279,34 +298,44 @@ void toggleScreenMode()
 #endif
 }
 
-static inline int mapWiipadButtons(uint16_t buttonData) {
+static inline int mapWiipadButtons(uint16_t buttonData)
+{
     int mapped = 0;
     // swap A and B buttons
-    if (buttonData & A) {
+    if (buttonData & A)
+    {
         mapped |= B;
     }
-    if (buttonData & B) {
+    if (buttonData & B)
+    {
         mapped |= A;
     }
-    if (buttonData & SELECT) {
+    if (buttonData & SELECT)
+    {
         mapped |= SELECT;
     }
-    if (buttonData & START) {
+    if (buttonData & START)
+    {
         mapped |= START;
     }
-    if (buttonData & UP) {
+    if (buttonData & UP)
+    {
         mapped |= UP;
     }
-    if (buttonData & DOWN) {
+    if (buttonData & DOWN)
+    {
         mapped |= DOWN;
     }
-    if (buttonData & LEFT) {
+    if (buttonData & LEFT)
+    {
         mapped |= LEFT;
     }
-    if (buttonData & RIGHT) {
+    if (buttonData & RIGHT)
+    {
         mapped |= RIGHT;
     }
-    if (buttonData & C) {
+    if (buttonData & C)
+    {
         mapped |= C;
     }
     return mapped;
@@ -329,7 +358,7 @@ void gwenesis_io_get_buttons()
                 (gp.buttons & io::GamePadState::Button::DOWN ? DOWN : 0) |
                 (gp.buttons & io::GamePadState::Button::A ? A : 0) |
                 (gp.buttons & io::GamePadState::Button::B ? B : 0) |
-                (gp.buttons & io::GamePadState::Button::X ? C : 0) |   // X button maps to C button on non-genesis controllers
+                (gp.buttons & io::GamePadState::Button::X ? C : 0) | // X button maps to C button on non-genesis controllers
                 (gp.buttons & io::GamePadState::Button::C ? C : 0) |
                 (gp.buttons & io::GamePadState::Button::SELECT ? SELECT : 0) |
                 (gp.buttons & io::GamePadState::Button::START ? START : 0) |
@@ -383,8 +412,9 @@ void gwenesis_io_get_buttons()
         {
             if (pushed & START)
             {
-                reboot = true;
-                printf("Reset pressed\n");
+                // reboot = true;
+                // printf("Reset pressed\n");
+                showSettings = true;
             }
             else if (pushed & UP)
             {
@@ -453,10 +483,9 @@ void gwenesis_io_get_buttons()
                           ((v & START) ? 1 << PAD_S : 0) |
                           ((v & A) ? 1 << PAD_A : 0) |
                           ((v & B) ? 1 << PAD_B : 0) |
-                          ((v & C) ? 1 << PAD_C : 0) ;
-                         // ((v & SELECT) ? 1 << PAD_C : 0);
+                          ((v & C) ? 1 << PAD_C : 0);
+        // ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
-
     }
 }
 
@@ -631,8 +660,7 @@ void __not_in_flash_func(emulate)()
     unsigned int old_screen_width = 0;
     unsigned int old_screen_height = 0;
     char tbuf[32];
-    // Improved FPS limiter: fixed timestep, no drift
-    uint64_t next_frame_time = 0;
+   
     while (!reboot)
     {
         /* Eumulator loop */
@@ -920,7 +948,7 @@ int main()
         }
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
 #endif
- 
+
         reset = false;
 
         abSwapped = 0; // don't swap A and B buttons
