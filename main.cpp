@@ -65,8 +65,8 @@ int frame = 0;
 int frame_cnt = 0;
 int frame_timer_start = 0;
 bool limit_fps = true; // was true
- // Improved FPS limiter: fixed timestep, no drift
-static uint64_t next_frame_time = 0;
+ 
+static uint64_t next_frame_time = 0;  // Used to track next frame time for limiting FPS
 int audio_enabled = 1; // Set to 1 to enable audio. Now disabled because its is not properly working.
 // bool frameskip = audio_enabled; // was true
 bool sn76489_enabled = true;
@@ -253,12 +253,8 @@ int ProcessAfterFrameIsRendered()
             reboot = true;
         }
         showSettings = false;
-        // Speaker can be muted/unmuted from settings menu
-        EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
-        // audio_enabled may be changed from settings menu
+        // audio_enabled may be changed from settings menu, Genesis specific
         audio_enabled = settings.flags.audioEnabled;
-        // avoid frame rate spike after settings menu
-        //Frens::PaceFrames60fps(true);
         next_frame_time = 0;
     }
     return count;
@@ -850,6 +846,7 @@ void __not_in_flash_func(emulate)()
 
         if (limit_fps)
         {
+            // Improved FPS limiter: fixed timestep, no drift
             const uint64_t frame_period = is_pal ? 20000 : 16666; // microseconds per frame
             if (next_frame_time == 0)
                 next_frame_time = time_us_64();
@@ -953,6 +950,7 @@ int main()
 
         abSwapped = 0; // don't swap A and B buttons
         audio_enabled = settings.flags.audioEnabled;
+        next_frame_time = 0;  // Reset next frame time for FPS limiter
         EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
         memset(palette, 0, sizeof(palette));
         printf("Starting game\n");
