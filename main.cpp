@@ -255,6 +255,7 @@ int ProcessAfterFrameIsRendered()
         showSettings = false;
         // audio_enabled may be changed from settings menu, Genesis specific
         audio_enabled = settings.flags.audioEnabled;
+        // Reset next frame time for FPS limiter
         next_frame_time = 0;
     }
     return count;
