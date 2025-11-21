@@ -935,7 +935,7 @@ int main()
 #if 1
         if (strlen(selectedRom) == 0 || reset == true)
         {
-            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md, .bin", selectedRom, "MD"); // never returns, but reboots upon selecting a game
+            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md, .bin", selectedRom); // never returns, but reboots upon selecting a game
         }
 #endif
 #if !HSTX
