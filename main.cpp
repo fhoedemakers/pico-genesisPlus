@@ -247,7 +247,9 @@ int ProcessAfterFrameIsRendered()
 #endif
  if (showSettings)
     {
+        abSwapped = 1;
         int rval = showSettingsMenu(true);
+        abSwapped = 0;
         if (rval == 3)
         {
             reboot = true;
