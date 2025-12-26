@@ -38,7 +38,8 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
   - Sample rate supported: 44100.
 - **RP2350 with PSRAM only**: Record about 30 seconds of audio by pressing START to pause the game and then START + BUTTON1. Audio is recorded to **/soundrecorder.wav** on the SD-card.
 
->[!NOTE] Currently wav playback is too fast. 
+>[!NOTE]
+> Currently wav playback is too fast. 
 
 ## Fixes
 
