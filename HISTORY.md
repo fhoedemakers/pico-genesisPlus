@@ -1,4 +1,22 @@
 # History of changes.
+
+# v0.10 Release notes
+
+## Features
+
+- Settings are saved to /settings_md.dat instead of /settings.dat. This allows to have separate settings files for different emulators (e.g. pico-infonesPlus and pico-peanutGB etc.).
+- Added a settings menu.
+  - Main menu: press SELECT to open; adjust options without using in-game button combos.
+  - In-game: press SELECT+START to open; from here you can also quit from the game.
+- Switched to Fatfs R0.16.
+
+## Fixes
+- Improved FPS limiter: now uses a fixed timestep approach and initializes timing at the start of emulation, ensuring stable frame rate from the first frame and correct behavior when emulator is overloaded.
+- Fruit Jam: Check VU-Meter toggle only once per frame in stead of multiple times per frame.
+- Fruit Jam: In game SELECT + RIGHT to toggle VU-Meter now works properly. 
+- Show correct buttonlabels in menus.
+- removed wrappers for f_chdir en f_cwd, fixed in Fatfs R0.16. (there was a long standing issue with f_chdir and f_cwd not working with exFAT formatted SD cards.)
+
 # v0.9 release notes
 
 ## Features
