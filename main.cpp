@@ -142,8 +142,9 @@ static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 // Visibility configuration for options menu (NES specific)
 // 1 = show option line, 0 = hide.
 // Order must match enum in menu_options.h
-const uint8_t g_settings_visibility[MOPT_COUNT] = {
+const int8_t g_settings_visibility[MOPT_COUNT] = {
     0,                               // Exit Game, or back to menu. Always visible when in-game.
+    -1,                              // No save states/restore states for Genesis
     !HSTX,                           // Screen Mode (only when not HSTX)
     HSTX,                            // Scanlines toggle (only when HSTX)
     1,                               // FPS Overlay
@@ -154,6 +155,7 @@ const uint8_t g_settings_visibility[MOPT_COUNT] = {
     1,                               // Font Back Color
     ENABLE_VU_METER,                 // VU Meter
     (HW_CONFIG == 8),                // Fruit Jam Internal Speaker
+    (HW_CONFIG == 8),                // Fruit Jam Volume Control
     0,                               // DMG Palette (Genesis emulator does not use GameBoy palettes)
     0,                               // Border Mode (Super Gameboy style borders not applicable for Genesis)
     0,                               // Rapid Fire on A (not applicable)
@@ -240,13 +242,15 @@ int ProcessAfterFrameIsRendered()
     if (isVUMeterToggleButtonPressed())
     {
         settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-        FrensSettings::savesettings();
+        //FrensSettings::savesettings();
         // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
         turnOffAllLeds();
     }
 #endif
  if (showSettings)
     {
+        showSettings = false;
+        FrensSettings::savesettings();
         abSwapped = 1;
         int rval = showSettingsMenu(true);
         abSwapped = 0;
@@ -254,7 +258,6 @@ int ProcessAfterFrameIsRendered()
         {
             reboot = true;
         }
-        showSettings = false;
         // audio_enabled may be changed from settings menu, Genesis specific
         audio_enabled = settings.flags.audioEnabled;
         // Reset next frame time for FPS limiter
@@ -290,7 +293,7 @@ void toggleScreenMode()
     {
         settings.screenMode = ScreenMode::SCANLINE_1_1;
     }
-    FrensSettings::savesettings();
+    //FrensSettings::savesettings();
     Frens::applyScreenMode(settings.screenMode);
 #else
     Frens::toggleScanLines();
@@ -443,7 +446,7 @@ void gwenesis_io_get_buttons()
 #else
                 settings.flags.useExtAudio = 0;
 #endif
-                FrensSettings::savesettings();
+                //FrensSettings::savesettings();
             }
             // else if (pushed & RIGHT)
             // {
@@ -458,7 +461,7 @@ void gwenesis_io_get_buttons()
             else if (pushed & RIGHT)
             {
                 settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-                FrensSettings::savesettings();
+                //FrensSettings::savesettings();
                 // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
                 turnOffAllLeds();
             }
@@ -471,7 +474,17 @@ void gwenesis_io_get_buttons()
             {
                 settings.flags.displayFrameRate = !settings.flags.displayFrameRate;
                 printf("FPS: %s\n", settings.flags.displayFrameRate ? "ON" : "OFF");
-                FrensSettings::savesettings();
+                //FrensSettings::savesettings();
+            } else if (pushed & LEFT) {
+#if HW_CONFIG == 8
+               settings.fruitjamVolumeLevel = std::max(-63, settings.fruitjamVolumeLevel - 1);
+               EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
+#endif
+            } else if (pushed & RIGHT) {
+#if HW_CONFIG == 8
+               settings.fruitjamVolumeLevel = std::min(23, settings.fruitjamVolumeLevel + 1);
+               EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
+#endif
             }
         }
         prevButtons[i] = v;
