@@ -278,7 +278,7 @@ static inline unsigned int gwenesis_bus_map_z80_address(unsigned int address) {
         default:
             bus_log(__FUNCTION__, "no map Z80 %x", address);
             assert(0);
-            return NONE;
+            return NONE_;
     }
 }
 
@@ -298,7 +298,7 @@ static inline unsigned int gwenesis_bus_map_io_address(unsigned int address) {
             // return (tmss_state == 0) ? TMSS_CTRL : NONE;
             bus_log(__FUNCTION__, "no map io %x", address);
 
-            return NONE;
+            return NONE_;
     }
 }
 
@@ -330,7 +330,7 @@ unsigned int gwenesis_bus_map_address(unsigned int address) {
     // If not a valid address return 0
     bus_log(__FUNCTION__, "M68K > ?? unnmap address %x", address);
     //assert(0);
-    return NONE;
+    return NONE_;
 }
 
 /******************************************************************************

@@ -58,7 +58,7 @@ extern uint8_t GWENESIS_AUDIO_SAMPLING_DIVISOR; // Audio quality (i.e. sampling 
 
 enum mapped_address
 {
-    NONE = 0,
+    NONE_ = 0,
     ROM_ADDR,
     ROM_ADDR_MIRROR,
     Z80_RAM_ADDR,
