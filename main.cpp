@@ -950,7 +950,7 @@ int main()
 #if 1
         if (strlen(selectedRom) == 0 || reset == true)
         {
-            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md, .bin", selectedRom); 
+            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md .bin", selectedRom); 
         }
 #endif
 #if !HSTX
