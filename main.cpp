@@ -860,6 +860,8 @@ void __not_in_flash_func(emulate)()
 
         frame++;
 
+#if 0
+        // Original FPS limiter code.
         if (limit_fps)
         {
             // Improved FPS limiter: fixed timestep, no drift
@@ -872,6 +874,39 @@ void __not_in_flash_func(emulate)()
             }
             next_frame_time += frame_period;
         }
+#else
+        // this should be more accurate, especially in DVI mode
+        if (limit_fps)
+        {
+            const uint64_t frame_period = is_pal ? 20000 : 16667; // 50Hz or 60Hz
+            const uint64_t now = time_us_64();
+
+            // Initialize first deadline
+            if (next_frame_time == 0)
+                next_frame_time = now + frame_period;
+
+            // Wait if ahead of schedule
+            if (now < next_frame_time)
+            {
+                uint64_t remaining = next_frame_time - now;
+                if (remaining > 150)
+                    sleep_us(remaining - 150);
+                while (time_us_64() < next_frame_time)
+                {
+                    tight_loop_contents();
+                }
+                // Advance by exactly one frame period
+                next_frame_time += frame_period;
+            }
+            else
+            {
+                // Late: advance until the deadline is in the future (catch up without drifting)
+                do {
+                    next_frame_time += frame_period;
+                } while (now >= next_frame_time);
+            }
+        }
+#endif
         if (settings.flags.audioEnabled)
         {
             //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
