@@ -123,7 +123,11 @@ static uint16_t wiipad_raw_cached = 0;
  * See: https://github.com/Wren6991/PicoDVI/issues/56
  */
 #define EMULATOR_CLOCKFREQ_KHZ 324000 // Overclock frequency in kHz when using Emulator
+#if HW_CONFIG == 7                    // RP2350 PiZero
+#define VOLTAGE VREG_VOLTAGE_2_50     // 2_50 OK 3_00 OK, Caution processor may run hot.
+#else
 #define VOLTAGE VREG_VOLTAGE_1_30
+#endif
 #else
 /* HSTX overclock notes:
  * Tested core clocks:
