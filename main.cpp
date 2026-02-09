@@ -150,7 +150,7 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     1,                               // FPS Overlay
     1,                               // Audio Enable
     1,                               // Frame Skip
-    (EXT_AUDIO_IS_ENABLED && !HSTX), // External Audio
+    (EXT_AUDIO_IS_ENABLED), // External Audio
     1,                               // Font Color
     1,                               // Font Back Color
     ENABLE_VU_METER,                 // VU Meter
@@ -618,6 +618,24 @@ static void inline processaudioPerFrameDVI()
         written += n;
     }
 }
+#else
+static void inline processaudioPerFramehstx()
+{
+    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i += 2)
+    {
+        int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+        int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
+        l >>= 3;
+        r >>= 3;
+        hstx_push_audio_sample(l, r);
+#if ENABLE_VU_METER
+        if (settings.flags.enableVUMeter)
+        {
+            addSampleToVUMeter(l);
+        }
+#endif
+    }
+}
 #endif
 static void inline processaudioPerFrameI2S()
 {
@@ -659,7 +677,14 @@ void inline output_audio_per_frame()
     processaudioPerFrameDVI();
 #endif
 #else
-    processaudioPerFrameI2S();
+    if (settings.flags.useExtAudio == 1)
+     {
+        processaudioPerFrameI2S();
+    }
+    else
+    {
+        processaudioPerFramehstx();
+     }
 #endif
 }
 
