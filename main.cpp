@@ -663,28 +663,17 @@ void inline output_audio_per_frame()
 
     // 2. Generate all audio samples for the frame
     gwenesis_SN76489_run(target_clocks);
-#if !HSTX
 #if EXT_AUDIO_IS_ENABLED
     if (settings.flags.useExtAudio == 1)
     {
         processaudioPerFrameI2S();
+        return;
     }
-    else
-    {
-        processaudioPerFrameDVI();
-    }
-#else
-    processaudioPerFrameDVI();
 #endif
+#if !HSTX
+    processaudioPerFrameDVI();
 #else
-    if (settings.flags.useExtAudio == 1)
-     {
-        processaudioPerFrameI2S();
-    }
-    else
-    {
-        processaudioPerFramehstx();
-     }
+    processaudioPerFramehstx();
 #endif
 }
 
