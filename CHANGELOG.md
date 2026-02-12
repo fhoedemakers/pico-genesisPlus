@@ -23,6 +23,25 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
+# v0.12 Release notes
+
+For the boards that use HSTX in stead of PicoDVI: HDMI audio is now supported via the new HSTX video driver. Huge thanks to [@fliperama86](https://github.com/fliperama86) for the awesome [pico_hdmi](https://github.com/fliperama86/pico_hdmi) driver that made this possible and for helping out.
+
+- Adafruit Fruit Jam.
+- Murmulator M2. 
+
+Other RP2350 configurations that now use HSTX (GPIO 12 - 19) in stead of PicoDVI:
+
+- [Breadboard](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard)
+- [PCB](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#pcb-with-raspberry-pi-pico-or-pico-2)
+- [Adafruit Metro RP2350](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#adafruit-metro-rp2350)
+  
+All the other boards still use PicoDVI.
+
+To enable audio over hdmi, make sure external audio is disabled in the settings menu.
+
+- Added option in settings menu to enter bootsel mode for flashing firmware. 
+
 # v0.11 Release notes
 
 - Added support for [Murmulator M1 and M2 boards](https://murmulator.ru). [@javavi](https://github.com/javavi)  [#150](https://github.com/fhoedemakers/pico-infonesPlus/issues/150)
