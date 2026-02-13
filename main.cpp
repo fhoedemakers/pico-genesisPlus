@@ -135,6 +135,8 @@ static uint16_t wiipad_raw_cached = 0;
  * Mitigation: Enter BOOTSEL mode before attaching the debugger at 378 MHz.
  */
 #define EMULATOR_CLOCKFREQ_KHZ 378000 //  Overclock frequency in kHz when using HSTX
+                                      // May cause artifacts on some screens, 336000 seems stable 
+                                      // https://github.com/fhoedemakers/retroJam/issues/7
 #define VOLTAGE VREG_VOLTAGE_1_60
 #endif
 // https://github.com/orgs/micropython/discussions/15722
