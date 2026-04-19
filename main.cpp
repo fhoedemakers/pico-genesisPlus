@@ -44,8 +44,8 @@ static char fpsString[4] = "000";
 #define FPSSTART (((MARGINTOP + 7) / 8) * 8)
 #define FPSEND ((FPSSTART) + 8)
 
-bool reset = false;
-bool reboot = false;
+static bool reset = false;
+static bool resetGame = false;
 
 extern unsigned short button_state[3];
 // uint16_t __scratch_y("gen_palette1") palette444_1[64];
@@ -146,17 +146,19 @@ static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 // Order must match enum in menu_options.h
 const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Exit Game, or back to menu. Always visible when in-game.
+    0,                               // Reset Game. Always visible when in-game.
     -1,                              // No save states/restore states for Genesis
     !HSTX,                           // Screen Mode (only when not HSTX)
     HSTX,                            // Scanlines toggle (only when HSTX)
     1,                               // FPS Overlay
     1,                               // Audio Enable
     1,                               // Frame Skip
+    (HSTX && ENABLEDVI),             // DVI Mode
     (EXT_AUDIO_IS_ENABLED), // External Audio
     1,                               // Font Color
     1,                               // Font Back Color
     ENABLE_VU_METER,                 // VU Meter
-    (HW_CONFIG == 8),                // Fruit Jam Internal Speaker
+    //(HW_CONFIG == 8),                // Fruit Jam Internal Speaker
     (HW_CONFIG == 8),                // Fruit Jam Volume Control
     0,                               // DMG Palette (Genesis emulator does not use GameBoy palettes)
     0,                               // Border Mode (Super Gameboy style borders not applicable for Genesis)
@@ -222,6 +224,7 @@ void __not_in_flash_func(processaudio)(int line)
 
 int ProcessAfterFrameIsRendered()
 {
+    Frens::pollHeadPhoneJack();
 #if NES_PIN_CLK != -1
     nespad_read_start();
 #endif
@@ -259,7 +262,12 @@ int ProcessAfterFrameIsRendered()
         abSwapped = 0;
         if (rval == 3)
         {
-            reboot = true;
+            reset = true;
+        }
+        if (rval == 5)
+        {
+            reset = true;
+            resetGame = true;
         }
         // audio_enabled may be changed from settings menu, Genesis specific
         audio_enabled = settings.flags.audioEnabled;
@@ -667,7 +675,7 @@ void inline output_audio_per_frame()
     // 2. Generate all audio samples for the frame
     gwenesis_SN76489_run(target_clocks);
 #if EXT_AUDIO_IS_ENABLED
-    if (settings.flags.useExtAudio == 1)
+    if (settings.flags.useExtAudio == 1 || Frens::isHeadPhoneJackConnected())
     {
         processaudioPerFrameI2S();
         return;
@@ -690,7 +698,7 @@ void __not_in_flash_func(emulate)()
     unsigned int old_screen_height = 0;
     char tbuf[32];
    
-    while (!reboot)
+    while (!reset)
     {
         /* Eumulator loop */
         int hint_counter = gwenesis_vdp_regs[10];
@@ -960,8 +968,6 @@ void __not_in_flash_func(emulate)()
             frame_counter++;
         }
     }
-
-    reboot = false;
 }
 
 /// @brief
@@ -1015,20 +1021,23 @@ int main()
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
 #endif
 
-        reset = false;
-
-        abSwapped = 0; // don't swap A and B buttons
+        
         audio_enabled = settings.flags.audioEnabled;
-        next_frame_time = 0;  // Reset next frame time for FPS limiter
-        EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
-        memset(palette, 0, sizeof(palette));
-        printf("Starting game\n");
-        init_emulator_mem();
-        load_cartridge(ROM_FILE_ADDR); // ROM_FILE_ADDR); // 0x100de000); // 0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
-        power_on();
-        reset_emulation();
-        emulate();
-        free_emulator_mem();
+      
+        do {
+              abSwapped = 0; // don't swap A and B buttons
+            reset = resetGame = false; 
+            next_frame_time = 0;  // Reset next frame time for FPS limiter
+            //EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
+            memset(palette, 0, sizeof(palette));
+            printf("Starting game\n");
+            init_emulator_mem();
+            load_cartridge(ROM_FILE_ADDR); // ROM_FILE_ADDR); // 0x100de000); // 0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
+            power_on();
+            reset_emulation();
+            emulate();
+            free_emulator_mem();
+        } while (resetGame);
         // system_shutdown();
         selectedRom[0] = 0;
         showSplash = false;
