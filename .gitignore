@@ -1,5 +1,6 @@
 *Zone.Identifier
 fh.log
+*.bin
 /pimoroni-pico/
 # Prerequisites
 *.d
