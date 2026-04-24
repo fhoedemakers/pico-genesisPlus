@@ -2264,8 +2264,8 @@ void YM2612Update(int16_t* buffer, int length) {
         /* only if Timer A does not overflow again (i.e CSM Key ON not set again) */
         ym2612.OPN.SL3.key_csm <<= 1;
 
-        /* timer A control */
-        INTERNAL_TIMER_A();
+        /* Timer A/B ticks moved to ym2612_run() to keep the YM2612 status
+           register responsive to Z80 reads at sub-frame granularity. */
 
         /* CSM Mode Key ON still disabled */
         if (ym2612.OPN.SL3.key_csm & 2) {
@@ -2277,28 +2277,30 @@ void YM2612Update(int16_t* buffer, int length) {
             ym2612.OPN.SL3.key_csm = 0;
         }
     }
-
-    /* timer B control */
-    INTERNAL_TIMER_B(length);
 }
 
+/* Tracks the YM2612 sample clock (in scaled master cycles, i.e. master / GWENESIS_AUDIO_SAMPLING_DIVISOR).
+   Reset to 0 at the start of every emulator frame, alongside zclk/system_clock/sn76489_clock. */
+int ym2612_clock = 0;
+
+/* Advance YM2612 internal timers (Timer A / Timer B) up to `target` master cycles.
+   Audio sample generation is done separately by YM2612Update; this function only
+   ticks the timers so the YM2612 status register reflects timer overflows in
+   real time. SGDK's Z80 audio drivers spin on the timer-overflow status bits, so
+   without this they hang and starve the 68K → black screen lockup. */
 void ym2612_run(int target) {
-    /**
-      if ( ym2612_clock >= target) {
-        return;
-      }
+    target /= GWENESIS_AUDIO_SAMPLING_DIVISOR;
+    if (target <= ym2612_clock) return;
 
-      target /= GWENESIS_AUDIO_SAMPLING_DIVISOR;
+    int samples = (target - ym2612_clock) / ym2612.divisor;
+    if (samples <= 0) return;
 
-      int ym2612_prev_index = ym2612_index;
-      ym2612_index += (target-ym2612_clock) / ym2612.divisor;
-      if (ym2612_index > ym2612_prev_index) {
-        YM2612Update(gwenesis_sn76489_buffer + ym2612_prev_index, ym2612_index - ym2612_prev_index);
-        ym2612_clock = ym2612_index*ym2612.divisor;
+    for (int i = 0; i < samples; i++) {
+        INTERNAL_TIMER_A();
+    }
+    INTERNAL_TIMER_B(samples);
 
-      } else {
-        ym2612_index = ym2612_prev_index;
-      }*/
+    ym2612_clock += samples * ym2612.divisor;
 }
 
 unsigned char* YM2612GetContextPtr(void) {
