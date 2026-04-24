@@ -697,7 +697,7 @@ void __not_in_flash_func(emulate)()
     unsigned int old_screen_width = 0;
     unsigned int old_screen_height = 0;
     char tbuf[32];
-   
+
     while (!reset)
     {
         /* Eumulator loop */
@@ -1027,13 +1027,13 @@ int main()
       
         do {
               abSwapped = 0; // don't swap A and B buttons
-            reset = resetGame = false; 
+            reset = resetGame = false;
             next_frame_time = 0;  // Reset next frame time for FPS limiter
             //EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
             memset(palette, 0, sizeof(palette));
             printf("Starting game\n");
             init_emulator_mem();
-            load_cartridge(ROM_FILE_ADDR); // ROM_FILE_ADDR); // 0x100de000); // 0x100d1000);  // 0x100e2000); // ROM_FILE_ADDR);
+            load_cartridge(ROM_FILE_ADDR);
             power_on();
             reset_emulation();
             emulate();

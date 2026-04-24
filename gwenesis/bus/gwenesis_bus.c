@@ -109,6 +109,18 @@ void load_cartridge(uintptr_t rom) {
 void power_on() {
     // Set M68K CPU as original MOTOROLA 68000
     //m68k_set_cpu_type(M68K_CPU_TYPE_68000);
+    /* Clean-slate the entire M68K core struct between game launches.
+       m68k_pulse_reset() only resets a handful of fields (PC/SP from
+       reset vectors, INT mask, supervisor flag, prefetch addr) and
+       leaves D0-D7, A0-A6, alternate SPs, NZVC flags, prefetch data,
+       instr_mode, aerr_*, idle-loop-detection state, etc. holding
+       whatever values the previous game left them in. That stale state
+       can re-enter the VBlank/exception path of the new game and send
+       PC into the vector-table region (recursive exception storm,
+       eventually overflowing host stack into a hardfault). m68ki_cycles
+       and the opcode jump tables live outside this struct, so wiping
+       it is safe; m68k_init() right after restores callbacks. */
+    memset(&m68k, 0, sizeof(m68k));
     // Initialize M68K CPU
     m68k_init();
     // Initialize Z80 CPU
@@ -138,6 +150,15 @@ void power_on() {
  *
  ******************************************************************************/
 void reset_emulation() {
+    /* Restore stale globals that previous game runs may have modified
+       (TMSS state, controller IO regs, pad state). Without this, a new
+       game's init reads back leftover values from the prior game and
+       takes a divergent execution path. */
+    tmss_state = 0;
+    tmss_count = 0;
+    memset(TMSS, 0, sizeof(TMSS));
+    gwenesis_io_reset();
+
     // Send a reset pulse to Z80 CPU
     z80_pulse_reset();
     // Send a reset pulse to Z80 M68K
