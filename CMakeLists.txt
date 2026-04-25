@@ -92,6 +92,7 @@ target_compile_definitions(${projectname} PUBLIC
     GPIOHSTXCK=${GPIOHSTXCK} # HSTX clock pin positive
     GPIOHSTXINVERTED=${GPIOHSTXINVERTED} # Set to 1 if HSTX pins are inverted: D- = D+ -1
     ENABLE_VU_METER=${ENABLE_VU_METER} # Enable VU meter (fruitjam NeoPixel leds)
+    ENABLEDVI=1
     #DVIAUDIOFREQ=53280  # 53.28kHz audio sample rate for DVI output
 )
 if(NOT PICO_PLATFORM STREQUAL "rp2040")
