@@ -142,6 +142,11 @@ int m68k_irq_acked(int irq) {
 }
 
 
+extern int sprite_overflow;
+extern bool sprite_collision;
+extern int mode_pal;
+extern unsigned short fifo[FIFO_SIZE];
+
 void gwenesis_vdp_reset() {
     memset(VRAM, 0, VRAM_MAX_SIZE);
     memset(SAT_CACHE, 0, sizeof(SAT_CACHE));
@@ -149,6 +154,7 @@ void gwenesis_vdp_reset() {
     //    memset(CRAM222, 0, sizeof(CRAM222));
     memset(VSRAM, 0, sizeof(VSRAM));
     memset(gwenesis_vdp_regs, 0, sizeof(gwenesis_vdp_regs));
+    memset(fifo, 0, sizeof(unsigned short) * FIFO_SIZE);
     command_word_pending = 0;
     address_reg = 0;
     code_reg = 0;
@@ -157,6 +163,14 @@ void gwenesis_vdp_reset() {
     gwenesis_vdp_status = 0x3C00;
     // //line_counter_interrupt = 0;
     hvcounter_latched = 0;
+    /* Previously left stale across game launches. With these clear, a new
+       game's init reads consistent VDP state regardless of what the
+       previous game left behind. */
+    hvcounter_latch = 0;
+    dma_fill_pending = 0;
+    sprite_overflow = 0;
+    sprite_collision = false;
+    mode_pal = 0;
 
     // register the M68K interrupt
     m68k_set_int_ack_callback(m68k_irq_acked);

@@ -1,5 +1,7 @@
 # CHANGELOG
 
+> HSTX improvements and SGDK games are playable now.
+
 # General Info
 
 
@@ -23,28 +25,25 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
-# v0.11 Release notes
+# v0.12 Release notes
 
-- Added support for [Murmulator M1 and M2 boards](https://murmulator.ru). [@javavi](https://github.com/javavi)  [#150](https://github.com/fhoedemakers/pico-infonesPlus/issues/150)
-  - M1: RP2040/RP2350
-  - M2: RP2350 only
-  **Note**: These Murmulator M1 and M2 builds are untested. Please report any issues.
-- **Fruit Jam only**: Add volume controls to settings menu. Can also be changed in-game via (START + LEFT/RIGHT). Note that too high volume levels may cause distortion. (Ext speaker, advised 16 db max, internal advised 18 dB max). Latest metadata package includes a sample.wav file to test the volume level.
-- Updated GenesisPlusMetaData.zip: Added **sample.wav**. This sample will be played when using the Fruit Jam volume control in the settings menu. Note when **/soundrecorder.wav** is found, this file will be played in stead.
-- Updated the menu to also list .wav audio files.
-- Added basic wav audio playback from within the menu. Press BUTTON2 or START to play the wav file. Tested with https://lonepeakmusic.itch.io/retro-midi-music-pack-1 The wav file must have the following specs:
-  - 16/24 bit PCM wav files only.  (24 bit files are downsampled to 16 bit) 
-  - 2ch stereo only.
-  - Sample rate supported: 44100.
-- **RP2350 with PSRAM only**: Record about 30 seconds of audio by pressing START to pause the game and then START + BUTTON1. Audio is recorded to **/soundrecorder.wav** on the SD-card.
+For the boards that use HSTX in stead of PicoDVI: HDMI audio is now supported via the new HSTX video driver. Huge thanks to [@fliperama86](https://github.com/fliperama86) for the awesome [pico_hdmi](https://github.com/fliperama86/pico_hdmi) driver that made this possible and for helping out.
 
->[!NOTE]
-> Currently wav playback is too fast. 
+- Adafruit Fruit Jam.
+- Murmulator M2. 
 
-## Fixes
+Other RP2350 configurations that now use HSTX (GPIO 12 - 19) in stead of PicoDVI:
 
-- Fruit Jam audio fixes.
-- Settings changed by in-game button combos are saved when exiting to menu.
+- [Breadboard](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard)
+- [PCB](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#pcb-with-raspberry-pi-pico-or-pico-2)
+- [Adafruit Metro RP2350](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#adafruit-metro-rp2350)
+  
+All the other boards still use PicoDVI.
+
+To enable audio over hdmi, make sure external audio is disabled in the settings menu.
+
+- Added option in settings menu to enter bootsel mode for flashing firmware. 
+- Partially fixed: Games developed with SGDK (like XenoCrisis) are now playable. However soundeffects are missing. [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
 
 # previous changes
 

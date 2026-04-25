@@ -226,6 +226,30 @@ void gwenesis_io_set_reg(unsigned int reg, unsigned int value) {
     return;
 }
 
+/* Restore the controller side of io_reg[] and gwenesis_io_pad_state[] to
+   power-on defaults. Without this, controller-config writes from a previous
+   game persist and change what the next game reads from $A10003/A10009
+   etc., causing init code to take a different branch and eventually crash.
+
+   io_reg[0] (the version register at $A10001) is intentionally NOT reset:
+   it is set by set_region() during load_cartridge() based on the ROM's
+   region code. Overwriting it here would make every NTSC ROM read back
+   the PAL default value (0xC1) and refuse to boot ("Developed for USE
+   only with NTSC Genesis Systems"). */
+void gwenesis_io_reset(void) {
+    /* skip index 0 (version register) */
+    unsigned char defaults_from_1[15] = {0x7f, 0x7f, 0x7f,
+                                         0x00, 0x00, 0x00,
+                                         0xff,    0,    0,
+                                         0xff,    0,    0,
+                                         0xff,    0,    0};
+    memcpy(&io_reg[1], defaults_from_1, sizeof(defaults_from_1));
+    gwenesis_io_pad_state[0] = 0x33;
+    gwenesis_io_pad_state[1] = 0x33;
+    gwenesis_io_pad_state[2] = 0x33;
+    button_state[0] = button_state[1] = button_state[2] = 0xff;
+}
+
 void gwenesis_io_save_state() {
     SaveState* state;
     state = saveGwenesisStateOpenForWrite("io");

@@ -28,6 +28,7 @@ void gwenesis_io_write_ctrl(unsigned int address, unsigned int value);
 unsigned int gwenesis_io_read_ctrl(unsigned int address);
 
 void gwenesis_io_set_reg(unsigned int reg, unsigned int value);
+void gwenesis_io_reset(void);
 void gwenesis_io_get_buttons();
 
 void gwenesis_io_save_state();

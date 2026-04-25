@@ -144,11 +144,17 @@ void z80_write_ctrl(unsigned int address, unsigned int value) {
   } else if (address == 0x1200) // RESET
   {
     z80_log(__FUNCTION__,"RESET = %d, current=%d", value,reset);
-  
-    if (value == 0) {
-      reset = 1;
-    } else {
 
+    if (value == 0) {
+      /* Reset asserted (active low). Hold Z80 in reset. */
+      reset = 1;
+    } else if (reset) {
+      /* Edge: reset was asserted, now deasserted. Pulse the Z80 once.
+         A redundant deassert (write of non-zero while already deasserted)
+         must NOT pulse — otherwise SGDK's repeated writes to this register
+         (e.g. inside Z80_getAndRequestBus / driver-ready polling) would
+         restart the Z80 every iteration and prevent any driver from ever
+         finishing its init. */
       z80_pulse_reset();
       reset = 0;
       reset_once = 1;

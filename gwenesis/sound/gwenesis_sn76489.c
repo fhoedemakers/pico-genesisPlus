@@ -230,9 +230,14 @@ extern int scan_line;
 extern bool sn76489_enabled;
 
 void YM2612Update(uint16_t *buffer, int length);
+extern void ym2612_run(int target);
 
 void gwenesis_SN76489_run(int target) {
     if (sn76489_clock >= target) return;
+
+    /* Tick YM2612 timers up to the same point in master cycles. Done before
+       dividing target so ym2612_run sees raw master cycles. */
+    ym2612_run(target);
 
     target /= GWENESIS_AUDIO_SAMPLING_DIVISOR;
 
