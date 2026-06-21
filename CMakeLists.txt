@@ -233,7 +233,11 @@ target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data
 # are unchanged. Enable with: cmake -DBUILD_FOR_BOOTLOADER=ON ..
 if(BUILD_FOR_BOOTLOADER)
     include("pico_shared/BootPartition.cmake")
-    frens_offset_for_bootloader(${projectname})
+    if(DEFINED BUILD_FOR_BOOTLOADER_SLOT)
+        frens_link_to_pinned_slot(${projectname} ${BUILD_FOR_BOOTLOADER_SLOT})
+    else()
+        frens_offset_for_bootloader(${projectname})
+    endif()
 endif()
 
 pico_add_extra_outputs(${projectname})
