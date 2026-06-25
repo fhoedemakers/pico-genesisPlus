@@ -147,6 +147,7 @@ static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Exit Game, or back to menu. Always visible when in-game.
     0,                               // Reset Game
+    BOOTLOADER_BUILD,                // Return to emuLoader picker (only when built for the loader)
     0,                               // Save / Restore State
     1,                               // Screen Mode
     0,                               // Scanlines toggle (superseded by Screen Mode)
@@ -170,7 +171,6 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // FDS Disk Swap (toggled on after fdsParse succeeds)
     0,                               // Overclock (CPU high clock toggle)
     1,                               // Enter bootsel mode
-    BOOTLOADER_BUILD,                // Return to emuLoader picker (only when built for the loader)
 };
 const uint8_t g_available_screen_modes_md[] = {
     0, // SCANLINE_8_7,
