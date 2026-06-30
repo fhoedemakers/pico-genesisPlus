@@ -8,7 +8,7 @@ Audio works, but quality is currently poor. When audio is enabled the emulator u
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
 
-Also games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK) mostly do not work. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
+Games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK) have no sound effects. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
@@ -20,6 +20,13 @@ Roms that are too big to load in flash or PSRAM are not listed.
 > This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
 > If you experience problems, try using a **different monitor or TV**.  
 
+## SD card setup 
+
+1. Prepare an SD card formatted as FAT32 (preferred) or exFAT
+2. Transfer Genesis/Megadrive ROM files to the card, preferably in /roms/MD (subdirectory organization is supported).
+3. Optionally include [metadata files](#using-metadata) for game information
+4. Insert the SD card into the device
+5. Use the menu to browse, select, and play games. Save data is automatically persisted to the SD card.
 
 ## Setup
 
