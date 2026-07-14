@@ -172,6 +172,7 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Overclock (CPU high clock toggle)
     0,                               // YM Audio (SMS only)
     1,                               // Enter bootsel mode
+    1,                               // Controller Test
 };
 const uint8_t g_available_screen_modes_md[] = {
     0, // SCANLINE_8_7,
