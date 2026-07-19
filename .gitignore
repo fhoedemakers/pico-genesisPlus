@@ -35,7 +35,7 @@ fh.log
 *.out
 *.app
 
-**/build
+**/build*/
 .vscode
 
 # Apple filesystem cruft

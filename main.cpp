@@ -146,26 +146,33 @@ static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
 // Order must match enum in menu_options.h
 const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Exit Game, or back to menu. Always visible when in-game.
-    0,                               // Reset Game. Always visible when in-game.
-    -1,                              // No save states/restore states for Genesis
-    !HSTX,                           // Screen Mode (only when not HSTX)
-    HSTX,                            // Scanlines toggle (only when HSTX)
+    0,                               // Reset Game
+    BOOTLOADER_BUILD,                // Return to emuLoader picker (only when built for the loader)
+    0,                               // Save / Restore State
+    1,                               // Screen Mode
+    0,                               // Scanlines toggle (superseded by Screen Mode)
+    HSTX,                            // Scanline Type (HSTX only)
     1,                               // FPS Overlay
-    1,                               // Audio Enable
-    1,                               // Frame Skip
-    (HSTX && ENABLEDVI),             // DVI Mode
-    (EXT_AUDIO_IS_ENABLED), // External Audio
+    0,                               // Audio Enable
+    0,                               // Frame Skip
+    HSTX && ENABLEDVI,                            // Display Mode (HDMI or DVI, only when HSTX is enabled, because non-HSTX builds always use HDMI)
+    (EXT_AUDIO_IS_ENABLED ), // External Audio
     1,                               // Font Color
     1,                               // Font Back Color
     ENABLE_VU_METER,                 // VU Meter
     //(HW_CONFIG == 8),                // Fruit Jam Internal Speaker
     (HW_CONFIG == 8),                // Fruit Jam Volume Control
-    0,                               // DMG Palette (Genesis emulator does not use GameBoy palettes)
-    0,                               // Border Mode (Super Gameboy style borders not applicable for Genesis)
-    0,                               // Rapid Fire on A (not applicable)
-    0,                               // Rapid Fire on B (not applicable)
-    1                                // Enter bootsel mode
-
+    0,                               // DMG Palette (NES emulator does not use GameBoy palettes)
+    0,                               // Border Mode (Super Gameboy style borders not applicable for NES)
+    0,                               // Rapid Fire on A
+    0,                               // Rapid Fire on B
+    0,                               // Auto Insert Disk A, enabled at runtime on RP2350
+    0,                               // Auto Swap FDS, enabled at runtime on RP2350
+    0,                               // FDS Disk Swap (toggled on after fdsParse succeeds)
+    0,                               // Overclock (CPU high clock toggle)
+    0,                               // YM Audio (SMS only)
+    1,                               // Enter bootsel mode
+    1,                               // Controller Test
 };
 const uint8_t g_available_screen_modes_md[] = {
     0, // SCANLINE_8_7,
