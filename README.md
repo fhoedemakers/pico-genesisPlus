@@ -2,11 +2,13 @@
 
 A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display. Works best with [Adafruit Fruitjam](https://www.adafruit.com/product/6200)
 
-Create a FAT32 (recommended) or exFAT formatted SD card and copy your NES roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
+Create a FAT32 (recommended) or exFAT formatted SD card and copy your Genesis/Mega Drive roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
 
 Audio is generated at the YM2612's native sample rate (~53 kHz) with cycle-accurate register timing, then resampled to 44.1 kHz — FM music, PSG (including the noise channel), DAC PCM samples (the "SE-GA!" voice) and [SGDK](https://github.com/Stephane-D/SGDK)/XGM-driver games all work. On HSTX builds the sound synthesis runs on core 1 alongside video scanout; on PicoDVI builds it runs on core 0 (frame skip can be enabled in the Settings menu if a game needs it — press SELECT in the menu to open the settings screen).
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
+
+Games cannot save their progress: cartridge save memory is not emulated, so games like "Sonic the Hedgehog 3" and "Phantasy Star IV" play fine but cannot store a save.
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 
@@ -24,7 +26,7 @@ Roms that are too big to load in flash or PSRAM are not listed.
 2. Transfer Genesis/Megadrive ROM files to the card, preferably in /roms/MD (subdirectory organization is supported).
 3. Optionally include [metadata files](#using-metadata) for game information
 4. Insert the SD card into the device
-5. Use the menu to browse, select, and play games. Save data is automatically persisted to the SD card.
+5. Use the menu to browse, select, and play games. Your settings are automatically persisted to the SD card.
 
 ## Setup
 
@@ -126,3 +128,36 @@ cd pico-genesisPlus
 git submodule update --init
 ./bld.sh -c8
 ````
+
+### Emulator core and PC test harness
+
+The emulator core in `gwenesis/` is a copy of the upstream
+[Gwenesis](https://github.com/bzhxx/gwenesis) sources with a small set of port
+changes. Every one of those changes is documented in
+[gwenesis/PORTING.md](gwenesis/PORTING.md), so the core can be refreshed from
+upstream later without losing them. The Pico-specific glue (sound engine, memory
+management, frame loop) lives in `port/`.
+
+`hosttest/` builds the same emulator core as a normal Linux program, which makes it
+possible to investigate emulation bugs without hardware. It renders frames to PPM
+files and writes the audio to WAV files, and runs under AddressSanitizer.
+
+````bash
+./hosttest/build.sh                                   # build hosttest/gen_host
+./hosttest/gen_host <rom.md> 600 60 hosttest/out      # 600 frames, dump every 60th
+python3 hosttest/ppm2png.py 'hosttest/out/*.ppm'      # PPM -> PNG
+````
+
+This writes `mixed.wav` (the final 44.1 kHz output) plus `ym.wav` and `psg.wav`
+(the FM and PSG chips separately, at their native rate), which is useful when
+tracking down a sound problem in one specific chip.
+
+To reproduce bugs that only appear when a game is started after another one, run a
+warm-up game first; the second game's output must be identical to starting it on
+its own:
+
+````bash
+GEN_FIRST_ROM=roms/sonic.md ./hosttest/gen_host roms/other.md 400 200 hosttest/out
+````
+
+Test roms placed in `hosttest/roms/` are ignored by git.

@@ -1,8 +1,6 @@
 # CHANGELOG
 
-> **Emulator core rebuilt from clean upstream [gwenesis](https://github.com/bzhxx/gwenesis) with a new sound engine.** Audio is now generated at the YM2612's native ~53 kHz with cycle-accurate register timestamps and resampled to 44.1 kHz: FM music, the PSG noise channel (was silent), DAC PCM ("SE-GA!") and SGDK/XGM games (sound effects were missing, [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)) all work. On HSTX boards the whole sound synthesis runs on core 1 next to the video scanout, so core 0 keeps its full budget for the 68000/Z80/VDP. Includes two upstream core fixes found via the new Linux host harness (`hosttest/`): a Z80 opcode-fetch out-of-bounds for code running from the RAM mirror, and the edge-triggered Z80 reset SGDK games need. Every core change is documented in `gwenesis/PORTING.md`.
-
-> Support for the pico-bootLoader bootloader, HDMI audio on HSTX boards, a reworked settings menu with a controller test screen, and improved USB controller support.
+> Rebuilt emulator core with a new sound engine: FM music, PSG noise, DAC samples (the "SEGAAA!" voice) and SGDK game audio all work now. 256-wide games fill the screen, and starting games one after another is stable.
 
 # General Info
 
@@ -27,65 +25,68 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
 
-# v0.13 Release notes
+# v0.14 Release notes
 
-The notes below cover all changes since **v0.11**. The items that were first published in v0.12 are repeated here, so that this list is complete for users upgrading directly from v0.11.
+The emulator core has been rebuilt from scratch from the upstream
+[Gwenesis](https://github.com/bzhxx/gwenesis) sources, with a new sound engine.
+Sound is the headline change: it should now be close to what the hardware does,
+including the games that had no sound effects at all before.
 
-## pico-bootLoader
+## Sound
 
-- This emulator can now be used with the new [pico-bootLoader](https://github.com/fhoedemakers/pico-bootLoader). The bootloader lets you keep several emulators, and a *Doom* port, on one board and choose which one to start from an on-screen menu at power-on. Switching between them no longer requires a computer.
-- The bootloader and an SD card archive containing this emulator are available on the [pico-bootLoader releases page](https://github.com/fhoedemakers/pico-bootLoader/releases). Installation is described in the readme of that project.
-- When the emulator is started from the bootloader, the settings menu contains an extra item, **Return to emulator selection**, to return to the boot menu.
-- The binaries listed at the end of this page are standalone versions and are installed via BOOTSEL as before. To build a bootloader version yourself, add `-DBUILD_FOR_BOOTLOADER=ON` to the cmake command line, or use `./bld.sh -2 -c <HW_CONFIG> -b`.
+- **Rewritten sound engine.** Audio is generated at the YM2612's own sample rate
+  (~53 kHz) with cycle-accurate register timing and resampled to 44.1 kHz, instead
+  of the low-rate, end-of-frame approach used before. FM music, PSG and DAC samples
+  are all affected.
+- **The "SEGAAA!" voice and other DAC samples now play correctly.**
+- **The PSG noise channel works again.** It was completely silent before, so drums,
+  explosions, waves and similar effects were missing from every game.
+- **Games developed with [SGDK](https://github.com/Stephane-D/SGDK), such as
+  *Xeno Crisis*, now have their sound effects and music.** This closes
+  [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11).
+- Audio no longer drops out in busy scenes: samples are paced to the HDMI/I2S
+  output continuously through the frame rather than in one burst per frame.
+- On HSTX boards the entire sound synthesis runs on the second processor core,
+  next to the video output, leaving the first core free for the emulation itself.
 
-## Video and HDMI
+## Video
 
-- For the boards that use HSTX instead of PicoDVI, HDMI audio is supported via the HSTX video driver. Thanks to [@fliperama86](https://github.com/fliperama86) for the [pico_hdmi](https://github.com/fliperama86/pico_hdmi) driver that made this possible and for helping out.
-  - Adafruit Fruit Jam.
-  - Murmulator M2.
-- Other RP2350 configurations that use HSTX (GPIO 12 - 19) instead of PicoDVI:
-  - [Breadboard](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard)
-  - [PCB](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#pcb-with-raspberry-pi-pico-or-pico-2)
-  - [Adafruit Metro RP2350](https://github.com/fhoedemakers/pico-infonesPlus?tab=readme-ov-file#adafruit-metro-rp2350)
+- **256-pixel-wide (H32) games now fill the screen.** Games such as *Columns* were
+  previously shown with black borders on the left and right; they are now scaled to
+  the full width, as on real hardware.
+- Fixed picture corruption in games that switch between 224 and 240 line modes
+  while a frame is being drawn.
 
-  All the other boards still use PicoDVI. To enable audio over HDMI, make sure external audio is disabled in the settings menu.
-- HDMI audio on HSTX boards is more reliable: audio dropouts are resolved and more TVs and AV receivers are accepted.
-- Fixed dots and dotted lines that could appear in the picture on some HDMI monitors.
-- New **Display Mode** setting on HSTX boards, to choose between HDMI and DVI output. DVI has slightly lower latency but carries no audio.
+## Stability
 
-## Settings menu
+- Fixed hard faults and out-of-memory errors when leaving a game and starting
+  another one. Games can now be started and exited repeatedly.
+- Fixed *Space Invaders '91* showing a corrupted screen when started after another
+  game had been played.
+- Fixed *Xeno Crisis* showing a black screen when started as the second game after
+  power-on.
 
-- New layout, with a SAVE / CANCEL / DEFAULT row and a scrollable list of options.
-- The scanlines on/off option has been replaced by **Screen Mode**, which offers 1:1 with and without scanlines.
-- New **Scanline Type** option on HSTX boards: *Simple* or *LCD*.
-- New **Controller Test** screen. It shows a gamepad on screen that follows the controller you last pressed a button on, and lists the connected controllers. This makes it possible to check wiring and button mappings without starting a game. Hold SELECT+START for 2 seconds to leave the screen.
-- Added an option to enter BOOTSEL mode for flashing firmware.
-- Added an option to return to the boot menu when the emulator was started from the bootloader.
-- The game list now starts in the `/roms/MD` folder instead of the root of the SD card. When that folder does not exist, the root folder is used. Placing your ROMs in `/roms/MD` is the recommended layout.
-- When leaving a subfolder, that folder stays selected in the list instead of returning to the top.
-- Settings are saved correctly when a game is reset, and settings changed with in-game button combinations are saved when returning to the menu.
-- The software version is shown on the splash screen.
-- Note: the format of the settings file has changed. Existing settings in `/settings_md.dat` are reset to their default values the first time this version starts.
+## Performance
 
-## Controllers
+- Full speed (60 fps) on HSTX boards such as the Adafruit Fruit Jam, including in
+  games with heavy sound activity.
 
-- Retro-bit Mega Drive Arcade pad: the X, Y, Z, L and R buttons now work.
-- DualShock 4 / DualSense: the L2 and R2 triggers now act as L and R.
-- PlayStation Classic controller: the Square button now works.
-- Wii Classic controller: the L and R shoulder buttons now work, as do ZL and ZR.
-- SNES controllers can now be used on the controller port of the PCB and breadboard setups. NES controllers keep working as before and are recognised automatically.
-- USB keyboard: added V, Q and W.
-- Fruit Jam: fixed the sound chip failing to start when an SNES Classic Mini controller is connected at power-on. That controller can now also be used from the moment the menu appears.
+## Known limitations
 
-## Games
+- Games that use interlace mode are still not supported; for example the two-player
+  levels of *Sonic the Hedgehog 2* show a blank screen.
+- Games cannot save their progress: cartridge save memory is not emulated, so
+  titles such as *Sonic 3* and *Phantasy Star IV* play but cannot store a save.
+- Non-HSTX (PicoDVI) boards still run the display at 77.1 Hz, see
+  [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 
-- Games developed with [SGDK](https://github.com/Stephane-D/SGDK), such as *Xeno Crisis*, now start and are playable. Sound effects in these games are still missing. [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
-- Starting a second game without switching the board off in between no longer leaves data of the previous game behind.
+## For developers
 
-## Other
-
-- More stable SD card access.
-- Several stability fixes in the menu and the video output.
+- Every difference between this emulator's copy of the Gwenesis core and upstream is
+  documented in `gwenesis/PORTING.md`, so the core can be updated from upstream again.
+- A PC test harness has been added in `hosttest/`. It builds the same emulator core
+  for Linux and dumps video frames and per-chip audio to files, which makes it
+  possible to find and fix emulation bugs without hardware.
 
 # previous changes
 
