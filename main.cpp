@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <algorithm>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
 #include "hardware/watchdog.h"
@@ -14,29 +15,37 @@
 #include "FrensFonts.h"
 #include "vumeter.h"
 #include "menu_settings.h"
-/* Gwenesis Emulator */
+
+/* Gwenesis emulator core (vendored upstream + port patches, see
+   gwenesis/PORTING.md) and the port layer around it. */
 extern "C"
 {
-#include "gwenesis/buffers.h"
-#include "gwenesis/cpus/M68K/m68k.h"
-#include "gwenesis/sound/z80inst.h"
-#include "gwenesis/bus/gwenesis_bus.h"
-#include "gwenesis/io/gwenesis_io.h"
-#include "gwenesis/vdp/gwenesis_vdp.h"
-#include "gwenesis/savestate/gwenesis_savestate.h"
-#include "gwenesis/sound/gwenesis_sn76489.h"
-#include "gwenesis/sound/ym2612.h"
+#include "gwenesis_bus.h"
+#include "gwenesis_vdp.h"
+#include "gwenesis_io.h"
+#include "gwenesis_savestate.h"
+#include "m68k.h"
+#include "z80inst.h"
+#include "ym2612.h"
+#include "gwenesis_sn76489.h"
+#include "gwsnd.h"
+#include "buffers.h"
 }
 
 bool isFatalError = false;
-static FATFS fs;
 char *romName;
 bool showSettings = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
+static int fpsFrameCount = 0;
 static char fpsString[4] = "000";
-#define fpsfgcolor 0     // black
-#define fpsbgcolor 0xFFF // white
+#if HSTX
+#define fpsfgcolor 0      // black (RGB555)
+#define fpsbgcolor 0x7FFF // white (RGB555)
+#else
+#define fpsfgcolor 0     // black (RGB444)
+#define fpsbgcolor 0xFFF // white (RGB444)
+#endif
 
 #define MARGINTOP 0
 #define MARGINBOTTOM 0
@@ -47,38 +56,13 @@ static char fpsString[4] = "000";
 static bool reset = false;
 static bool resetGame = false;
 
-extern unsigned short button_state[3];
-// uint16_t __scratch_y("gen_palette1") palette444_1[64];
-// uint16_t __scratch_y("gen_palette2") palette444_2[64];
-uint16_t palette[64]; // = palette444_1;
+extern "C" unsigned char button_state[3];
 
-/* Clocks and synchronization */
-/* system clock is video clock */
-int system_clock;
-unsigned int lines_per_frame = LINES_PER_FRAME_NTSC; // 262; /* NTSC: 262, PAL: 313 */
-int scan_line;
-unsigned int frame_counter = 0;
-unsigned int drawFrame = 1;
-int z80_enable_mode = 2;
-bool interlace = true; // was true
-int frame = 0;
-int frame_cnt = 0;
-int frame_timer_start = 0;
-bool limit_fps = true; // was true
- 
-static uint64_t next_frame_time = 0;  // Used to track next frame time for limiting FPS
-int audio_enabled = 1; // Set to 1 to enable audio. Now disabled because its is not properly working.
-// bool frameskip = audio_enabled; // was true
-bool sn76489_enabled = true;
-uint8_t snd_accurate = 1;
-
-extern unsigned char gwenesis_vdp_regs[0x20];
-extern unsigned int gwenesis_vdp_status;
-extern unsigned int screen_width, screen_height;
-extern int hint_pending;
-
-int sn76489_index; /* sn78649 audio buffer index */
-int sn76489_clock;
+static unsigned int drawFrame = 1;
+static int frame = 0;
+static bool limit_fps = true;
+static uint64_t next_frame_time = 0; // next deadline for the FPS limiter
+int audio_enabled = 1;
 bool toggleDebugFPS = false;
 #if WII_PIN_SDA >= 0 and WII_PIN_SCL >= 0
 // Cached Wii pad state updated once per frame in ProcessAfterFrameIsRendered()
@@ -133,17 +117,20 @@ static uint16_t wiipad_raw_cached = 0;
  * At both tested values the HSTX (serial video) clock can be tuned so display refresh stays 60 Hz.
  * Debug quirk: At 378 MHz a hard fault (signal trap) may occur when starting a debug session.
  * Mitigation: Enter BOOTSEL mode before attaching the debugger at 378 MHz.
+ *
+ * Voltage: 1.50 V, matching the FlashParams overclock limits
+ * (pico_shared/FlashParams.cpp pairs 378000 kHz with VREG_VOLTAGE_1_50).
  */
 #define EMULATOR_CLOCKFREQ_KHZ 378000 //  Overclock frequency in kHz when using HSTX
-                                      // May cause artifacts on some screens, 336000 seems stable 
+                                      // May cause artifacts on some screens, 336000 seems stable
                                       // https://github.com/fhoedemakers/retroJam/issues/7
-#define VOLTAGE VREG_VOLTAGE_1_60
+#define VOLTAGE VREG_VOLTAGE_1_50
 #endif
-// https://github.com/orgs/micropython/discussions/15722
-static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ; // 340000; //266000;
-// Visibility configuration for options menu (NES specific)
+static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ;
+
+// Visibility configuration for options menu
 // 1 = show option line, 0 = hide.
-// Order must match enum in menu_options.h
+// Order must match enum in menu_settings.h
 const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Exit Game, or back to menu. Always visible when in-game.
     0,                               // Reset Game
@@ -155,20 +142,19 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     1,                               // FPS Overlay
     0,                               // Audio Enable
     0,                               // Frame Skip
-    HSTX && ENABLEDVI,                            // Display Mode (HDMI or DVI, only when HSTX is enabled, because non-HSTX builds always use HDMI)
-    (EXT_AUDIO_IS_ENABLED ), // External Audio
+    HSTX && ENABLEDVI,               // Display Mode (HDMI or DVI, only when HSTX is enabled, because non-HSTX builds always use HDMI)
+    (EXT_AUDIO_IS_ENABLED),          // External Audio
     1,                               // Font Color
     1,                               // Font Back Color
     ENABLE_VU_METER,                 // VU Meter
-    //(HW_CONFIG == 8),                // Fruit Jam Internal Speaker
     (HW_CONFIG == 8),                // Fruit Jam Volume Control
-    0,                               // DMG Palette (NES emulator does not use GameBoy palettes)
-    0,                               // Border Mode (Super Gameboy style borders not applicable for NES)
+    0,                               // DMG Palette
+    0,                               // Border Mode
     0,                               // Rapid Fire on A
     0,                               // Rapid Fire on B
-    0,                               // Auto Insert Disk A, enabled at runtime on RP2350
-    0,                               // Auto Swap FDS, enabled at runtime on RP2350
-    0,                               // FDS Disk Swap (toggled on after fdsParse succeeds)
+    0,                               // Auto Insert Disk A
+    0,                               // Auto Swap FDS
+    0,                               // FDS Disk Swap
     0,                               // Overclock (CPU high clock toggle)
     0,                               // YM Audio (SMS only)
     1,                               // Enter bootsel mode
@@ -180,54 +166,6 @@ const uint8_t g_available_screen_modes_md[] = {
     1, // SCANLINE_1_1,
     1  // NOSCANLINE_1_1
 };
-#if 0
-int sampleIndex = 0;
-void __not_in_flash_func(processaudio)(int line)
-{
-    constexpr int samplesPerLine = ((GWENESIS_AUDIO_BUFFER_LENGTH_NTSC + SCREENHEIGHT - 1) / SCREENHEIGHT); // 735/192 = 3.828125 192*4=768 735/3=245
-    if (line == 0)
-    {
-        sampleIndex = 0;
-    }
-    if (sampleIndex >= (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC << 1))
-    {
-        return;
-    }
-    // rounded up sample rate per scanline
-    int samples = samplesPerLine;
-    // printf("line %d, SampleIndex: %d, Samples: %d\n", line,  sampleIndex    , samples);
-    // short *p1 = gwenesis_sn76489_buffer + sampleIndex; // snd.buffer[0] + sampleIndex;
-    // short *p2 = gwenesis_sn76489_buffer + sampleIndex + 1; // snd.buffer[1] + sampleIndex;
-
-    //  = (gwenesis_sn76489_buffer[sampleIndex / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-    while (samples)
-    {
-        auto &ring = dvi_->getAudioRingBuffer();
-        auto n = std::min<int>(samples, ring.getWritableSize());
-        // printf("\tSamples: %d, n: %d,\n", samples, n);
-        if (!n)
-        {
-            // printf("Line %d, Audio buffer overrun\n", line);
-            return;
-        }
-        auto p = ring.getWritePointer();
-        int ct = n;
-        // printf("\tSamples: %d, n: %d, ct: %d\n", samples, n, ct);
-        while (ct--)
-        {
-            int l = gwenesis_sn76489_buffer[sampleIndex / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR];
-            int r = gwenesis_sn76489_buffer[(sampleIndex + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR];
-            // p1 += 2;
-            // p2 += 2;
-            *p++ = {static_cast<short>(l), static_cast<short>(r)};
-            sampleIndex += 2;
-            // printf("\tSamples: %d, n: %d, ct: %d\n", samples, n, ct);
-        }
-        ring.advanceWritePointer(n);
-        samples -= n;
-    }
-}
-#endif
 
 int ProcessAfterFrameIsRendered()
 {
@@ -255,12 +193,10 @@ int ProcessAfterFrameIsRendered()
     if (isVUMeterToggleButtonPressed())
     {
         settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-        //FrensSettings::savesettings();
-        // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
         turnOffAllLeds();
     }
 #endif
- if (showSettings)
+    if (showSettings)
     {
         showSettings = false;
         FrensSettings::savesettings();
@@ -276,7 +212,6 @@ int ProcessAfterFrameIsRendered()
             reset = true;
             resetGame = true;
         }
-        // audio_enabled may be changed from settings menu, Genesis specific
         audio_enabled = settings.flags.audioEnabled;
         // Reset next frame time for FPS limiter
         next_frame_time = 0;
@@ -285,7 +220,6 @@ int ProcessAfterFrameIsRendered()
 }
 
 static DWORD prevButtons[2]{};
-static DWORD prevButtonssystem[2]{};
 
 static int rapidFireMask[2]{};
 static int rapidFireCounter = 0;
@@ -311,7 +245,6 @@ void toggleScreenMode()
     {
         settings.screenMode = ScreenMode::SCANLINE_1_1;
     }
-    //FrensSettings::savesettings();
     Frens::applyScreenMode(settings.screenMode);
 #else
     Frens::toggleScanLines();
@@ -360,13 +293,14 @@ static inline int mapWiipadButtons(uint16_t buttonData)
     }
     return mapped;
 }
-void gwenesis_io_get_buttons()
+
+/* Core callback: refresh button_state[] (active low, S A C B R L D U). */
+extern "C" void gwenesis_io_get_buttons()
 {
     char timebuf[10];
     bool usbConnected = false;
     for (int i = 0; i < 2; i++)
     {
-        // auto &dst = (i == 0) ? *pdwPad1 : *pdwPad2;
         auto &gp = io::getCurrentGamePadState(i);
         if (i == 0)
         {
@@ -423,8 +357,6 @@ void gwenesis_io_get_buttons()
             rv &= ~rapidFireMask[i];
         }
 
-        // dst = rv;
-
         auto p1 = v;
 
         auto pushed = v & ~prevButtons[i];
@@ -432,8 +364,6 @@ void gwenesis_io_get_buttons()
         {
             if (pushed & START)
             {
-                // reboot = true;
-                // printf("Reset pressed\n");
                 showSettings = true;
             }
             else if (pushed & UP)
@@ -442,7 +372,6 @@ void gwenesis_io_get_buttons()
             }
             else if (pushed & DOWN)
             {
-
                 toggleDebugFPS = !toggleDebugFPS;
                 Frens::ms_to_d_hhmmss(Frens::time_ms(), timebuf, sizeof timebuf);
                 printf("Uptime %s, Debug FPS %s\n", timebuf, toggleDebugFPS ? "ON" : "OFF");
@@ -460,27 +389,14 @@ void gwenesis_io_get_buttons()
                 {
                     printf("Using DVIAudio\n");
                 }
-
 #else
                 settings.flags.useExtAudio = 0;
 #endif
-                //FrensSettings::savesettings();
             }
-            // else if (pushed & RIGHT)
-            // {
-            //     settings.flags.audioEnabled = !settings.flags.audioEnabled;
-            //     audio_enabled = settings.flags.audioEnabled;  // Needed to keep external audio_enabled variable in sync
-            //     //audio_enabled = !audio_enabled;
-            //     //frameskip = audio_enabled;
-            //     printf("Audio %s, Frameskip %s\n", settings.flags.audioEnabled ? "enabled" : "disabled", settings.flags.frameSkip ? "enabled" : "disabled");
-            //     FrensSettings::savesettings();
-            // }
 #if ENABLE_VU_METER
             else if (pushed & RIGHT)
             {
                 settings.flags.enableVUMeter = !settings.flags.enableVUMeter;
-                //FrensSettings::savesettings();
-                // printf("VU Meter %s\n", settings.flags.enableVUMeter ? "enabled" : "disabled");
                 turnOffAllLeds();
             }
 #endif
@@ -492,16 +408,19 @@ void gwenesis_io_get_buttons()
             {
                 settings.flags.displayFrameRate = !settings.flags.displayFrameRate;
                 printf("FPS: %s\n", settings.flags.displayFrameRate ? "ON" : "OFF");
-                //FrensSettings::savesettings();
-            } else if (pushed & LEFT) {
+            }
+            else if (pushed & LEFT)
+            {
 #if HW_CONFIG == 8
-               settings.fruitjamVolumeLevel = std::max(-63, settings.fruitjamVolumeLevel - 1);
-               EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
+                settings.fruitjamVolumeLevel = std::max(-63, settings.fruitjamVolumeLevel - 1);
+                EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
 #endif
-            } else if (pushed & RIGHT) {
+            }
+            else if (pushed & RIGHT)
+            {
 #if HW_CONFIG == 8
-               settings.fruitjamVolumeLevel = std::min(23, settings.fruitjamVolumeLevel + 1);
-               EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
+                settings.fruitjamVolumeLevel = std::min(23, settings.fruitjamVolumeLevel + 1);
+                EXT_AUDIO_SETVOLUME(settings.fruitjamVolumeLevel);
 #endif
             }
         }
@@ -514,401 +433,251 @@ void gwenesis_io_get_buttons()
                           ((v & A) ? 1 << PAD_A : 0) |
                           ((v & B) ? 1 << PAD_B : 0) |
                           ((v & C) ? 1 << PAD_C : 0);
-        // ((v & SELECT) ? 1 << PAD_C : 0);
         button_state[i] = ~button_state[i];
     }
 }
 
-const uint8_t __not_in_flash_func(paletteBrightness)[] = {0, 52, 87, 116, 144, 172, 206, 255};
+/* ------------------------------------------------------------------ */
+/* Audio sinks: the gwsnd resampler delivers 44.1 kHz stereo samples   */
+/* through one of these, chosen per frame.                             */
+/* ------------------------------------------------------------------ */
 
-extern "C" void genesis_set_palette(const uint8_t index, const uint32_t color)
+static bool i2sActive = false;
+
+static void audioOutI2S(int16_t l, int16_t r)
 {
-    uint8_t b = paletteBrightness[(color >> 9) & 0x0F];
-    uint8_t g = paletteBrightness[(color >> 5) & 0x0F];
-    uint8_t r = paletteBrightness[(color >> 1) & 0x0F];
-#if !HSTX
-    // RGB444
-    palette[index] = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
+#if ENABLE_VU_METER
+    if (settings.flags.enableVUMeter)
+    {
+        addSampleToVUMeter(l);
+    }
+#endif
+}
+
+#if HSTX
+/* HSTX builds run the resampler on core1 (offload). HDMI audio may be
+   pushed from core1 (the DI ring's consumer is the core1 DMA IRQ), but
+   I2S and the VU meter must stay on core0 — those samples go through the
+   gwsnd bridge, drained once per frame in the emulate loop. */
+static void __not_in_flash_func(audioOutHstx)(int16_t l, int16_t r)
+{
+    hstx_push_audio_sample(l, r);
+#if ENABLE_VU_METER
+    if (settings.flags.enableVUMeter)
+    {
+        gwsnd_bridge_push(l, r); /* VU fed on core0 via the bridge */
+    }
+#endif
+}
+
+static void bridgeVUOnly(int16_t l, int16_t r)
+{
+    (void)r;
+#if ENABLE_VU_METER
+    if (settings.flags.enableVUMeter)
+    {
+        addSampleToVUMeter(l);
+    }
 #else
-    // RGB555
-    palette[index] = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    (void)l;
 #endif
 }
-#if 0
-uint8_t maxkol = 0;
-void __not_in_flash_func(processEmulatorScanLine)(int line, uint8_t *framebuffer, uint16_t *dvibuffer)
+#else
+static void audioOutDVI(int16_t l, int16_t r)
 {
-    // processaudio(line);
-    if (line < 224)
-    {
-        auto current_line = &framebuffer[line * SCREENWIDTH];
-        int srcIndex = 0;
-        // screen_width is resolution from the emulator
-        if (screen_width < SCREENWIDTH)
-        {
-            memset(dvibuffer, 0, 32 * 2);
-        }
-        for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
-        {
-            if (kol < screen_width + 32)
-            {
-                dvibuffer[kol] = palette444[current_line[srcIndex] & 0x3f];
-                dvibuffer[kol + 1] = palette444[current_line[srcIndex + 1] & 0x3f];
-                dvibuffer[kol + 2] = palette444[current_line[srcIndex + 2] & 0x3f];
-                dvibuffer[kol + 3] = palette444[current_line[srcIndex + 3] & 0x3f];
-            }
-            else
-            {
-                dvibuffer[kol] = 0;
-                dvibuffer[kol + 1] = 0;
-                dvibuffer[kol + 2] = 0;
-                dvibuffer[kol + 3] = 0;
-            }
-
-            srcIndex += 4;
-        }
-
-        if (fps_enabled && line >= FPSSTART && line < FPSEND)
-        {
-            WORD *fpsBuffer = dvibuffer + 5;
-            int rowInChar = line % 8;
-            for (auto i = 0; i < 3; i++)
-            {
-                char firstFpsDigit = fpsString[i];
-                char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
-                for (auto bit = 0; bit < 8; bit++)
-                {
-                    if (fontSlice & 1)
-                    {
-                        *fpsBuffer++ = fpsfgcolor;
-                    }
-                    else
-                    {
-                        *fpsBuffer++ = fpsbgcolor;
-                    }
-                    fontSlice >>= 1;
-                }
-            }
-        }
-    }
-    else
-    {
-        // memset(dvibuffer, 0, SCREENWIDTH * 2);
-    }
-}
-#endif
-
-#if !HSTX
-static void inline processaudioPerFrameDVI()
-{
-    // 3. Output audio buffer
-    // Example: output to DVI ring buffer (stereo, duplicate mono)
     auto &ring = dvi_->getAudioRingBuffer();
-    // GWENESIS_AUDIO_SAMPLING_DIVISOR  --> totalSamples
-    //                        6               148
-    //                        5               177
-    //                        1               888
-    int totalSamples = sn76489_index; // Number of samples generated this frame
-    int written = 0;
-    // sizeof snd_buf = 3522, idem as gwenesis_sn76489_buffer
-
-    // static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
-    // for (int h = 0; h < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; h++) {
-    //             snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-    // }
-    // printf("Audio samples to write: %d, %d target_clocks\n", totalSamples, target_clocks);
-    while (written < (GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2))
+    if (ring.getWritableSize() < 1)
     {
-        int n = std::min<int>(GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2 - written, ring.getWritableSize());
-        if (n == 0)
-        {
-            //  printf("Audio buffer full, wrote %d of %d samples\n", written, totalSamples);
-            // Buffer full, can't write more
-            break;
-        }
-        auto p = ring.getWritePointer();
-        for (int i = 0; i < n; ++i)
-        {
-            int16_t sample = (gwenesis_sn76489_buffer[(written + i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) >> 2;
-            *p++ = {sample, sample}; // Duplicate mono to stereo
-        }
-        ring.advanceWritePointer(n);
-        written += n;
+        return;
     }
+    auto p = ring.getWritePointer();
+    *p = {l, r};
+    ring.advanceWritePointer(1);
 }
+#endif
+
+/* Sink backlog in permille of its target (1000 = on target), used by the
+   resampler's drift trim. In offload mode this runs on CORE1 — it only
+   reads volatile counters. */
+static int sinkFillPermille()
+{
+#if EXT_AUDIO_IS_ENABLED
+    if (i2sActive)
+    {
+        return audio_i2s_get_fill_permille() * 2; /* target: ring half full */
+    }
+#endif
+#if HSTX
+    return (int)(hstx_di_queue_get_level() * 1000 / 64); /* target: 64 of 256 packets */
 #else
-static void inline processaudioPerFramehstx()
-{
-    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i += 2)
-    {
-        int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        l >>= 3;
-        r >>= 3;
-        hstx_push_audio_sample(l, r);
-#if ENABLE_VU_METER
-        if (settings.flags.enableVUMeter)
-        {
-            addSampleToVUMeter(l);
-        }
+    auto &ring = dvi_->getAudioRingBuffer();
+    int fill = AUDIOBUFFERSIZE - (int)ring.getWritableSize();
+    return fill * 1000 / (AUDIOBUFFERSIZE / 2); /* target: ring half full */
 #endif
-    }
 }
-#endif
-static void inline processaudioPerFrameI2S()
-{
-    for (int i = 0; i < GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2; i += 2)
-    {
-        int16_t l = (gwenesis_sn76489_buffer[(i) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        int16_t r = (gwenesis_sn76489_buffer[(i + 1) / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]);
-        l >>= 3;
-        r >>= 3;
-        EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
-#if ENABLE_VU_METER
-        if (settings.flags.enableVUMeter)
-        {
-            addSampleToVUMeter(l);
-        }
-#endif
-    }
-}
-void inline output_audio_per_frame()
-{
-    // 1. Calculate total PSG clocks for this frame
-    const bool is_pal = REG1_PAL;
-    const int lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
-    const int target_clocks = lines_per_frame * VDP_CYCLES_PER_LINE;
 
-    // 2. Generate all audio samples for the frame
-    gwenesis_SN76489_run(target_clocks);
+static void selectAudioSink()
+{
+    if (!audio_enabled)
+    {
+        i2sActive = false;
+        gwsnd_set_output(nullptr);
+        return;
+    }
 #if EXT_AUDIO_IS_ENABLED
     if (settings.flags.useExtAudio == 1 || Frens::isHeadPhoneJackConnected())
     {
-        processaudioPerFrameI2S();
+        i2sActive = true;
+#if HSTX
+        /* resampler runs on core1: hand samples to core0 via the bridge */
+        gwsnd_set_output(gwsnd_bridge_push);
+        gwsnd_set_bridge_sink(audioOutI2S);
+#else
+        gwsnd_set_output(audioOutI2S);
+#endif
         return;
     }
 #endif
-#if !HSTX
-    processaudioPerFrameDVI();
+    i2sActive = false;
+#if HSTX
+    gwsnd_set_output(audioOutHstx);
+    gwsnd_set_bridge_sink(bridgeVUOnly);
 #else
-    processaudioPerFramehstx();
+    gwsnd_set_output(audioOutDVI);
 #endif
+}
+
+/* ------------------------------------------------------------------ */
+/* Frame loop: shared verbatim with the host harness.                  */
+/* ------------------------------------------------------------------ */
+extern "C"
+{
+#include "frame_loop.inc"
+}
+
+static inline uint16_t *framebufferLine(int line)
+{
+#if HSTX
+    return hstx_getlineFromFramebuffer(line);
+#else
+    return &Frens::framebuffer[line * SCREENWIDTH];
+#endif
+}
+
+/* FPS overlay: drawn straight into the framebuffer after the frame. */
+static void drawFpsOverlay()
+{
+    for (int line = FPSSTART; line < FPSEND; line++)
+    {
+        uint16_t *fpsBuffer = framebufferLine(line) + 5;
+        int rowInChar = line % 8;
+        for (auto i = 0; i < 3; i++)
+        {
+            char fontSlice = getcharslicefrom8x8font(fpsString[i], rowInChar);
+            for (auto bit = 0; bit < 8; bit++)
+            {
+                *fpsBuffer++ = (fontSlice & 1) ? fpsfgcolor : fpsbgcolor;
+                fontSlice >>= 1;
+            }
+        }
+    }
 }
 
 void __not_in_flash_func(emulate)()
 {
-
-    // FH gwenesis_vdp_set_buffer((uint8_t *)SCREEN);
-    uint8_t frameline_buffer[SCREENWIDTH];
     bool firstLoop = true;
-    unsigned int old_screen_width = 0;
-    unsigned int old_screen_height = 0;
+    int old_screen_width = 0;
+    int old_screen_height = 0;
     char tbuf[32];
+
+    /* Perf diagnostics, printed once per second while the SELECT+DOWN
+       debug toggle is on: core work time per frame (emulation vs whole
+       pre-pacing loop), sound FIFO high-water/drops, DI queue level. */
+    uint32_t dbgEmuSum = 0, dbgEmuMax = 0, dbgTotSum = 0, dbgTotMax = 0, dbgFrames = 0;
+    uint64_t dbgLastPrint = time_us_64();
 
     while (!reset)
     {
-        /* Eumulator loop */
-        int hint_counter = gwenesis_vdp_regs[10];
-
-        const bool is_pal = REG1_PAL;
-        screen_width = REG12_MODE_H40 ? 320 : 256;
-        screen_height = is_pal ? 240 : 224;
-        lines_per_frame = is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
-        // Printf values
+        uint64_t t_frame0 = time_us_64();
+        int is_pal = gwenesis_frame_get_config();
+        gwsnd_set_pal(is_pal);
         if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
         {
-            // printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame);
-            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, lines_per_frame: %d, audio_enabled: %d, frameskip: %d\n", Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height, lines_per_frame, settings.flags.audioEnabled, settings.flags.frameSkip);
+            printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, audio_enabled: %d, frameskip: %d\n",
+                   Frens::ms_to_d_hhmmss(Frens::time_ms(), tbuf, sizeof tbuf), is_pal, screen_width, screen_height,
+                   settings.flags.audioEnabled, settings.flags.frameSkip);
             firstLoop = false;
             old_screen_height = screen_height;
             old_screen_width = screen_width;
         }
 
-        gwenesis_vdp_render_config();
-
-        zclk = 0;
-        /* Reset the difference clocks and audio index */
-        system_clock = 0;
-        sn76489_clock = 0;
-        sn76489_index = 0;
-        ym2612_clock = 0;
-        scan_line = 0;
-        if (z80_enable_mode == 1)
-            z80_run(lines_per_frame * VDP_CYCLES_PER_LINE);
-        auto margin = SCREENHEIGHT - screen_height;
-        if (margin > 0)
-        {
-            margin /= 2;
-        }
-        else
+        /* Vertical centering: the framebuffer is 320x240, NTSC games are
+           224 lines. The core renders directly into the framebuffer. */
+        int margin = (SCREENHEIGHT - screen_height) / 2;
+        if (margin < 0)
         {
             margin = 0;
         }
-        while (scan_line < lines_per_frame)
+        gwenesis_vdp_set_buffer(framebufferLine(margin));
+
+        /* Frameskip: render every frame unless enabled (then skip 1 of 3). */
+        drawFrame = !settings.flags.frameSkip || (frame % 3 != 0);
+
+        selectAudioSink();
+
+        uint64_t t_emu0 = time_us_64();
+        gwenesis_frame_run(drawFrame);
+        uint32_t emu_us = (uint32_t)(time_us_64() - t_emu0);
+
+        if (drawFrame && settings.flags.displayFrameRate)
         {
-            // if (audio_enabled)
-            // {
-            //     processaudio(scan_line);
-            // }
-            // printf("%d\n", scan_line);
-
-            uint8_t *tmpbuffer = frameline_buffer;
-
-            /* CPUs */
-            m68k_run(system_clock + VDP_CYCLES_PER_LINE);
-            if (z80_enable_mode == 2)
-                z80_run(system_clock + VDP_CYCLES_PER_LINE);
-            /* Video */
-            // Interlace mode
-            // if (drawFrame && !interlace || (frame % 2 == 0 && scan_line % 2) || scan_line % 2 == 0)
-            // {
-            if (drawFrame)
-            {
-                // if (scan_line < 240)
-                // {
-                //     frameline_buffer = Frens::framebufferCore0 + (scan_line * 320);
-                // }
-                gwenesis_vdp_render_line(scan_line, frameline_buffer); /* render scan_line */
-                if (scan_line < screen_height)
-                {
-                    auto currentLineBuf =
-#if !HSTX
-                        &Frens::framebuffer[(scan_line + margin) * 320];
-#else
-                        hstx_getlineFromFramebuffer(scan_line + margin);
-#endif
-
-#if 0
-                    for (int kol = (screen_width == SCREENWIDTH ? 0 : 32); kol < SCREENWIDTH; kol += 4)
-                    {
-                        if (kol < screen_width + 32)
-                        {
-                            currentLineBuf[kol] = palette[tmpbuffer[0] & 0x3f];
-                            currentLineBuf[kol + 1] = palette[tmpbuffer[1] & 0x3f];
-                            currentLineBuf[kol + 2] = palette[tmpbuffer[2] & 0x3f];
-                            currentLineBuf[kol + 3] = palette[tmpbuffer[3] & 0x3f];
-                        }
-                        else
-                        {
-                            currentLineBuf[kol] = 0;
-                            currentLineBuf[kol + 1] = 0;
-                            currentLineBuf[kol + 2] = 0;
-                            currentLineBuf[kol + 3] = 0;
-                        }
-                        tmpbuffer += 4;
-                    }
-#else
-                    // Optimized pixel transfer
-                    int start = (screen_width == SCREENWIDTH) ? 0 : 32;
-                    int visible = screen_width;                 // active pixels
-                    int tail = SCREENWIDTH - (start + visible); // right border size
-
-                    uint8_t *src = tmpbuffer;               // source indices
-                    uint16_t *dst = currentLineBuf + start; // destination
-                    const uint16_t *pal = palette;          // palette pointer
-
-                    int groups = visible >> 2; // number of 4-pixel groups
-                    while (groups--)
-                    {
-                        dst[0] = pal[src[0] & 0x3F];
-                        dst[1] = pal[src[1] & 0x3F];
-                        dst[2] = pal[src[2] & 0x3F];
-                        dst[3] = pal[src[3] & 0x3F];
-                        src += 4;
-                        dst += 4;
-                    }
-                    if (tail > 0)
-                    {
-                        memset(dst, 0, tail * sizeof(uint16_t));
-                    }
-#endif
-                    if (settings.flags.displayFrameRate && scan_line >= FPSSTART && scan_line < FPSEND)
-                    {
-                        WORD *fpsBuffer = currentLineBuf + 5;
-                        int rowInChar = scan_line % 8;
-                        for (auto i = 0; i < 3; i++)
-                        {
-                            char firstFpsDigit = fpsString[i];
-                            char fontSlice = getcharslicefrom8x8font(firstFpsDigit, rowInChar);
-                            for (auto bit = 0; bit < 8; bit++)
-                            {
-                                if (fontSlice & 1)
-                                {
-                                    *fpsBuffer++ = fpsfgcolor;
-                                }
-                                else
-                                {
-                                    *fpsBuffer++ = fpsbgcolor;
-                                }
-                                fontSlice >>= 1;
-                            }
-                        }
-                    }
-                }
-            }
-            // }
-
-            // On these lines, the line counter interrupt is reloaded
-            if (scan_line == 0 || scan_line > screen_height)
-            {
-                hint_counter = REG10_LINE_COUNTER;
-            }
-
-            // interrupt line counter
-            if (--hint_counter < 0)
-            {
-                if (REG0_LINE_INTERRUPT != 0 && scan_line <= screen_height)
-                {
-                    hint_pending = 1;
-                    if ((gwenesis_vdp_status & STATUS_VIRQPENDING) == 0)
-                        m68k_update_irq(4);
-                }
-                hint_counter = REG10_LINE_COUNTER;
-            }
-
-            scan_line++;
-
-            // vblank begin at the end of last rendered line
-            if (scan_line == screen_height)
-            {
-                if (REG1_VBLANK_INTERRUPT != 0)
-                {
-                    gwenesis_vdp_status |= STATUS_VIRQPENDING;
-                    m68k_set_irq(6);
-                }
-                z80_irq_line(1);
-            }
-
-            if (!is_pal && scan_line == screen_height + 1)
-            {
-                z80_irq_line(0);
-                // FRAMESKIP every 3rd frame
-                drawFrame = !settings.flags.frameSkip || (frame % 3 != 0);
-            }
-
-            system_clock += VDP_CYCLES_PER_LINE;
+            drawFpsOverlay();
         }
+
+#if HSTX
+        /* Final sweep of the core1->core0 sample bridge (I2S / VU); the
+           bulk is drained incrementally per scanline by gwsnd_line_tick. */
+        gwsnd_bridge_drain();
+#endif
 
         ProcessAfterFrameIsRendered();
-
         frame++;
+        rapidFireCounter++;
 
-#if 0
-        // Original FPS limiter code.
-        if (limit_fps)
+        uint32_t tot_us = (uint32_t)(time_us_64() - t_frame0);
+        dbgEmuSum += emu_us;
+        dbgTotSum += tot_us;
+        if (emu_us > dbgEmuMax)
+            dbgEmuMax = emu_us;
+        if (tot_us > dbgTotMax)
+            dbgTotMax = tot_us;
+        dbgFrames++;
+        if (toggleDebugFPS && (time_us_64() - dbgLastPrint) >= 1000000)
         {
-            // Improved FPS limiter: fixed timestep, no drift
-            const uint64_t frame_period = is_pal ? 20000 : 16666; // microseconds per frame
-            if (next_frame_time == 0)
-                next_frame_time = time_us_64();
-            while ((int64_t)(next_frame_time + frame_period - time_us_64()) > 0)
-            {
-                busy_wait_at_least_cycles(10);
-            }
-            next_frame_time += frame_period;
+            printf("perf: frames=%u emu avg=%u max=%u us, loop avg=%u max=%u us",
+                   dbgFrames, dbgEmuSum / dbgFrames, dbgEmuMax,
+                   dbgTotSum / dbgFrames, dbgTotMax);
+#if GWSND_OFFLOAD
+            printf(", fifo_hw=%u drops=%u", gwsnd_stats_fifo_highwater(),
+                   gwsnd_stats_drops());
+#endif
+#if HSTX
+            printf(", di=%u resync=%d", (unsigned)hstx_di_queue_get_level(),
+                   get_video_output_resync_count());
+#endif
+            printf("\n");
+            dbgEmuSum = dbgEmuMax = dbgTotSum = dbgTotMax = dbgFrames = 0;
+            dbgLastPrint = time_us_64();
         }
-#else
-        // this should be more accurate, especially in DVI mode
+        else if (!toggleDebugFPS && dbgFrames >= 600)
+        {
+            /* keep the accumulators fresh so enabling the toggle shows
+               recent numbers, not an average since game start */
+            dbgEmuSum = dbgEmuMax = dbgTotSum = dbgTotMax = dbgFrames = 0;
+            dbgLastPrint = time_us_64();
+        }
+
         if (limit_fps)
         {
             const uint64_t frame_period = is_pal ? 20000 : 16667; // 50Hz or 60Hz
@@ -934,48 +703,42 @@ void __not_in_flash_func(emulate)()
             else
             {
                 // Late: advance until the deadline is in the future (catch up without drifting)
-                do {
+                do
+                {
                     next_frame_time += frame_period;
                 } while (now >= next_frame_time);
             }
         }
-#endif
-        if (settings.flags.audioEnabled)
-        {
-            //  gwenesis_SN76489_run(REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC * VDP_CYCLES_PER_LINE);
-            output_audio_per_frame();
-        }
-        // ym2612_run(262 * VDP_CYCLES_PER_LINE);
-        /*
-        gwenesis_SN76489_run(262 * VDP_CYCLES_PER_LINE);
-        ym2612_run(262 * VDP_CYCLES_PER_LINE);
-        static int16_t snd_buf[GWENESIS_AUDIO_BUFFER_LENGTH_NTSC * 2];
-        for (int h = 0; h < ym2612_index * 2 * GWENESIS_AUDIO_SAMPLING_DIVISOR; h++) {
-            snd_buf[h] = (gwenesis_sn76489_buffer[h / 2 / GWENESIS_AUDIO_SAMPLING_DIVISOR]) << 3;
-        }
-        i2s_dma_write(&i2s_config, snd_buf);*/
-        // reset m68k cycles to the begin of next frame cycle
-        m68k.cycles -= system_clock;
-
-        /* copy audio samples for DMA */
-        // gwenesis_sound_submit();
 
         // calculate framerate
         if (settings.flags.displayFrameRate)
         {
+            fpsFrameCount++;
             uint64_t tick_us = Frens::time_us() - start_tick_us;
             if (tick_us > 1000000)
             {
-                fps = frame_counter;
+                fps = fpsFrameCount;
                 start_tick_us = Frens::time_us();
-                frame_counter = 0;
+                fpsFrameCount = 0;
             }
             fpsString[0] = '0' + (fps / 100) % 10;
             fpsString[1] = '0' + (fps / 10) % 10;
             fpsString[2] = '0' + (fps % 10);
-            frame_counter++;
         }
     }
+}
+
+/* Size of the currently selected ROM file (the core needs it to build its
+   address mask; pico_shared only exports the data pointer). */
+static size_t getSelectedRomSize(const char *path)
+{
+    FILINFO fno;
+    if (f_stat(path, &fno) == FR_OK)
+    {
+        return (size_t)fno.fsize;
+    }
+    printf("f_stat(%s) failed, assuming 4MB rom\n", path);
+    return 4 * 1024 * 1024;
 }
 
 /// @brief
@@ -990,7 +753,6 @@ int main()
     romName = selectedRom;
     ErrorMessage[0] = selectedRom[0] = 0;
 
-    int fileSize = 0;
     Frens::setClocksAndStartStdio(CPUFreqKHz, VOLTAGE);
 
     printf("==========================================================================================\n");
@@ -1012,14 +774,13 @@ int main()
     bool showSplash = true;
     g_settings_visibility = g_settings_visibility_md;
     g_available_screen_modes = g_available_screen_modes_md;
+    gwsnd_set_fill_query(sinkFillPermille);
     while (true)
     {
-#if 1
         if (strlen(selectedRom) == 0 || reset == true)
         {
-            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md .bin", selectedRom); 
+            menu("Pico-Genesis+", ErrorMessage, isFatalError, showSplash, ".md .bin", selectedRom);
         }
-#endif
 #if !HSTX
         if (settings.screenMode != ScreenMode::SCANLINE_1_1 && settings.screenMode != ScreenMode::NOSCANLINE_1_1)
         {
@@ -1029,24 +790,30 @@ int main()
         scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
 #endif
 
-        
         audio_enabled = settings.flags.audioEnabled;
-      
-        do {
-              abSwapped = 0; // don't swap A and B buttons
+        size_t romSize = getSelectedRomSize(selectedRom);
+
+        do
+        {
+            abSwapped = 0; // don't swap A and B buttons
             reset = resetGame = false;
-            next_frame_time = 0;  // Reset next frame time for FPS limiter
-            //EXT_AUDIO_MUTE_INTERNAL_SPEAKER(settings.flags.fruitJamEnableInternalSpeaker == 0);
-            memset(palette, 0, sizeof(palette));
-            printf("Starting game\n");
-            init_emulator_mem();
-            load_cartridge(ROM_FILE_ADDR);
+            next_frame_time = 0; // Reset next frame time for FPS limiter
+            printf("Starting game (%d KB rom)\n", (int)(romSize / 1024));
+            if (!init_emulator_mem())
+            {
+                snprintf(ErrorMessage, 40, "Out of memory starting game");
+                printf("%s\n", ErrorMessage);
+                reset = true;
+                break;
+            }
+            load_cartridge((const unsigned char *)ROM_FILE_ADDR, romSize);
             power_on();
             reset_emulation();
+            gwsnd_init(0 /* pal detected per frame */, HSTX);
             emulate();
+            gwsnd_shutdown();
             free_emulator_mem();
         } while (resetGame);
-        // system_shutdown();
         selectedRom[0] = 0;
         showSplash = false;
     }

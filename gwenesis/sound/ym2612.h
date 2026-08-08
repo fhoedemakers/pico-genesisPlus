@@ -16,17 +16,27 @@
 #ifndef _H_YM2612_
 #define _H_YM2612_
 
-extern int16_t *gwenesis_sn76489_buffer;
+#if GWENESIS_PICO != 0
+extern int16_t *gwenesis_ym2612_buffer; /* allocated by the port (port/buffers.c) */
+#else
+extern int16_t gwenesis_ym2612_buffer[];
+#endif
+extern int ym2612_index;
 extern int ym2612_clock;
-///extern int ym2612_index;
 
-extern int snd_output_volume;
+#if defined(GWENESIS_LUTS_IN_RAM) && GWENESIS_LUTS_IN_RAM != 0
+/* Byte sizes of the RAM working copies of the big LUTs (see ym2612.c). */
+#define YM2612_TL_TAB_BYTES (13 * 2 * 256 * sizeof(int))
+#define YM2612_SIN_TAB_BYTES (1024 * sizeof(unsigned int))
+#define YM2612_LFO_PM_TABLE_BYTES (128 * 8 * 16)
+extern void ym2612_luts_init_ram(void *tl, void *sin_, void *lfo);
+#endif
 
-extern void YM2612Init();
+extern void YM2612Init(void);
 extern void YM2612Config(unsigned char dac_bits); //,unsigned int AUDIO_FREQ_DIVISOR);
 extern void YM2612ResetChip(void);
 //extern void YM2612Update(int16_t *buffer, int length);
-extern void YM2612Write(unsigned int a, unsigned int v,  int target);
+extern void YM2612Write(unsigned int a, unsigned int v, int target);
 extern void ym2612_run(int target);
 extern unsigned int YM2612Read(int target);
 

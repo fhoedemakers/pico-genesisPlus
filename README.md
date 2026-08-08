@@ -4,11 +4,9 @@ A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads r
 
 Create a FAT32 (recommended) or exFAT formatted SD card and copy your NES roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
 
-Audio works, but quality is currently poor. When audio is enabled the emulator uses frame skipping to maintain performance. You can also enable or disable frame skip in the Settings menu. (Press SELECT in the menu to open the settings screen)
+Audio is generated at the YM2612's native sample rate (~53 kHz) with cycle-accurate register timing, then resampled to 44.1 kHz — FM music, PSG (including the noise channel), DAC PCM samples (the "SE-GA!" voice) and [SGDK](https://github.com/Stephane-D/SGDK)/XGM-driver games all work. On HSTX builds the sound synthesis runs on core 1 alongside video scanout; on PicoDVI builds it runs on core 0 (frame skip can be enabled in the Settings menu if a game needs it — press SELECT in the menu to open the settings screen).
 
 Games that use interlace mode like are not supported. For example "Sonic the Hedgehog 2" uses interlace mode for some levels. Those levels show a blank screen.
-
-Games developed with the popular [SGDK](https://github.com/Stephane-D/SGDK) have no sound effects. See [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis) and [Pico-Megadrive for murmulator board](https://github.com/xrip/pico-megadrive)
 

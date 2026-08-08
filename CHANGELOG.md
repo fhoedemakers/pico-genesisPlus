@@ -1,5 +1,7 @@
 # CHANGELOG
 
+> **Emulator core rebuilt from clean upstream [gwenesis](https://github.com/bzhxx/gwenesis) with a new sound engine.** Audio is now generated at the YM2612's native ~53 kHz with cycle-accurate register timestamps and resampled to 44.1 kHz: FM music, the PSG noise channel (was silent), DAC PCM ("SE-GA!") and SGDK/XGM games (sound effects were missing, [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11)) all work. On HSTX boards the whole sound synthesis runs on core 1 next to the video scanout, so core 0 keeps its full budget for the 68000/Z80/VDP. Includes two upstream core fixes found via the new Linux host harness (`hosttest/`): a Z80 opcode-fetch out-of-bounds for code running from the RAM mirror, and the edge-triggered Z80 reset SGDK games need. Every core change is documented in `gwenesis/PORTING.md`.
+
 > Support for the pico-bootLoader bootloader, HDMI audio on HSTX boards, a reworked settings menu with a controller test screen, and improved USB controller support.
 
 # General Info

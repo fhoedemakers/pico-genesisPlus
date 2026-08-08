@@ -43,12 +43,9 @@
 
 #include <setjmp.h>
 #include "macros.h"
-#include "pico.h"
-#include "../../buffers.h"
 #ifdef HOOK_CPU
 #include "cpuhook.h"
 #endif
-//#include <avr/pgmspace.h>
 
 /* ======================================================================== */
 /* ==================== ARCHITECTURE-DEPENDANT DEFINES ==================== */
@@ -82,7 +79,7 @@
 
 /* signed and unsigned int must be at least 32 bits wide */
 #define sint   signed   int
-//#define uint   unsigned int
+#define uint   unsigned int
 
 
 #if M68K_USE_64_BIT
@@ -152,26 +149,59 @@
 #define ROM_SWAP
 #define RAM_SWAP
 
-// 8/16/32 bits access to RAM/ROM
+// 16/32 bits acces to RAM/ROM
 
-extern const unsigned char *ROM_DATA;
-extern const unsigned char *ROM_METADATA;
-//extern unsigned char* M68K_RAM;
+#if GWENESIS_PICO != 0
 
-// ROM needs to be converted for this to work!
-#define FETCH8ROM(A)    (unsigned char)  ROM_DATA[ A^1 ]
-#define FETCH16ROM(A)  ( (unsigned short)  (*((unsigned short *) &ROM_DATA[A])) )
-#define FETCH32ROM(A) ( (*(unsigned short *)(&ROM_DATA[(A+2)])) | ((*(unsigned short *)(&ROM_DATA[A])) << 16))
+	/* ROM is a pointer into PSRAM or XIP flash (pre-byte-swapped).
+	   rom_addr_mask (pow2ceil(romsize)-1, set by load_cartridge) mirrors
+	   and bounds every fetch: the old static 8 MB array was safe by
+	   construction, a bare pointer is not. */
+	extern const unsigned char *ROM_DATA;
+	extern unsigned int rom_addr_mask;
+	extern unsigned char *M68K_RAM;
 
-#define FETCH8RAM(A)         (unsigned char)  M68K_RAM[ (A ^ 1) & 0xFFFF]
-#define FETCH16RAM(A)   ( (unsigned short)  (*((unsigned short *) &M68K_RAM[A&0XFFFF])) )
-#define FETCH32RAM(A) ( (*(unsigned short *)(&M68K_RAM[(A+2)&0XFFFF])) | ((*(unsigned short *)(&M68K_RAM[A&0XFFFF])) << 16))
+#define FETCH8ROM(A) ((ROM_DATA[(((A) & rom_addr_mask) ^ 1)]))
+#define FETCH16ROM(A) ((*(const unsigned short *)&ROM_DATA[((A) & rom_addr_mask)]))
+#define FETCH32ROM(A) ( (*(const unsigned int *)&ROM_DATA[((A) & rom_addr_mask)] << 16) | (*(const unsigned int *)&ROM_DATA[((A) & rom_addr_mask)] >> 16) )
 
-#define WRITE8RAM(A, V)   M68K_RAM[ (A ^ 1) & 0xFFFF ] =  V
-#define WRITE16RAM(A, V)  ( *((unsigned short *) &M68K_RAM[ A & 0XFFFF ]) = V )
-// RAM needs to be cyclically accessible (i.e. addresses wrap around)
-#define WRITE32RAM(A, V)  ( *((unsigned short *) &M68K_RAM[  A      & 0XFFFF ]) = V >> 16); \
-                          ( *((unsigned short *) &M68K_RAM[ (A + 2) & 0XFFFF ]) = V & 0xffff); \
+#else
+#if GNW_TARGET_MARIO != 0 | GNW_TARGET_ZELDA != 0
+
+	extern unsigned char *ROM_DATA;
+	extern unsigned char *M68K_RAM;
+#else
+
+	extern unsigned char ROM_DATA[];
+	extern unsigned char M68K_RAM[];
+#endif
+
+#define FETCH8ROM(A) ((ROM_DATA[((A) ^ 1)]))
+#define FETCH16ROM(A) ((*(unsigned short *)&ROM_DATA[(A)]))
+#define FETCH32ROM(A) ( (*(unsigned int *)&ROM_DATA[(A)] << 16) | (*(unsigned int *)&ROM_DATA[(A)] >> 16) )
+#endif
+
+#if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
+
+/* Direct access to ITCRAM as M68KRAM on STM32H7 mapped at 0x0 !!  */
+#define FETCH8RAM(A)    (*(unsigned char  *)(((A)&0XFFFF) ^ 1))
+#define FETCH16RAM(A)   (*(unsigned short *)((A)&0XFFFF))
+#define FETCH32RAM(A) (((*(unsigned int *)((A)&0XFFFF)) << 16) | ((*(unsigned int *)((A)&0XFFFF)) >> 16))
+
+#define WRITE8RAM(A, V)  ((*(unsigned char  *)(((A)&0XFFFF) ^ 1)) = (V))
+#define WRITE16RAM(A, V) ((*(unsigned short *)( (A)&0XFFFF))      = (V))
+#define WRITE32RAM(A, V) ((*(unsigned int   *)( (A)&0XFFFF))      = (((V) << 16) | ((V) >> 16)))
+#else
+
+#define FETCH8RAM(A) ((M68K_RAM[(A ^ 1) & 0xFFFF]))
+#define FETCH16RAM(A) ((*(unsigned short *)&M68K_RAM[(A)&0XFFFF]))
+#define FETCH32RAM(A) ( (*(unsigned int *)&M68K_RAM[(A&0XFFFF)] << 16) | (*(unsigned int *)&M68K_RAM[(A&0XFFFF)] >> 16) )
+
+#define WRITE8RAM(A, V) (M68K_RAM[(A ^ 1) & 0xFFFF] = (V))
+#define WRITE16RAM(A, V) ((*(unsigned short *)&M68K_RAM[(A)&0XFFFF] = (V)))
+#define WRITE32RAM(A, V) ((*(unsigned int *)&M68K_RAM[(A)&0XFFFF] =( ((V) << 16) | ((V) >> 16) ) ))
+
+#endif
 
 #define m68k_read_immediate_16(A) ( ( (A) & 0x800000) ? FETCH16RAM((A)) : FETCH16ROM((A)) )
 #define m68k_read_immediate_32(A) ( ( (A) & 0x800000) ? FETCH32RAM((A)) : FETCH32ROM((A)) )
@@ -298,7 +328,11 @@ typedef struct
 
 typedef struct
 {
+#if GWENESIS_PICO == 0
+  /* 5 KB of dead weight on the Pico: every reader of this table is inside
+     an #if 0 block in m68kcpu.h — the port compiles it out. */
   cpu_memory_map memory_map[256]; /* memory mapping */
+#endif
 
   cpu_idle_t poll;      /* polling detection */
 

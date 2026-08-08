@@ -68,6 +68,11 @@ add_executable(${projectname}
     splash.cpp
     DefaultSS444.c
     DefaultSS555.c
+    port/buffers.c
+    port/gwsnd_core0.c
+    port/gwsnd_resample.c
+    port/gwsnd_shadow.c
+    port/savestate_stubs.c
 )
 
 pico_set_program_name(${projectname} "${projectname}")
@@ -145,8 +150,23 @@ target_compile_definitions(${projectname} PUBLIC
     # FrensHelpers::setClocksAndStartStdio only honors this when PIO-USB is in use
     # (PLL_USB must stay at 48 MHz for native TinyUSB).
     GENESIS_OVERCLOCK_HSTX_FIX=1
-    #DVIAUDIOFREQ=53280  # 53.28kHz audio sample rate for DVI output
 )
+
+# The gwenesis core renders directly into the display framebuffer, so its
+# CRAM->pixel conversion must match the video driver's format:
+# HSTX (pico_hdmi) = RGB555, PicoDVI = RGB444. See gwenesis/gwenesis_port.h.
+# Same condition as the HSTX macro in pico_shared/FrensHelpers.h: all four
+# HSTX pins configured (BoardConfigs only sets them for HSTX-capable boards
+# when USE_HSTX=1 and FORCE_DVI=0; HSTX pins are never GPIO 0).
+if(GPIOHSTXD0 AND GPIOHSTXD1 AND GPIOHSTXD2 AND GPIOHSTXCK)
+    target_compile_definitions(${projectname} PUBLIC GWENESIS_PIXEL_FMT=555)
+    # HSTX: sound synthesis is offloaded to core1 (the pico_hdmi background
+    # task); core0 keeps a shadow of the YM2612 timers for status reads.
+    target_compile_definitions(${projectname} PUBLIC GWSND_OFFLOAD=1)
+    target_sources(${projectname} PRIVATE port/gwsnd_core1.c)
+else()
+    target_compile_definitions(${projectname} PUBLIC GWENESIS_PIXEL_FMT=444)
+endif()
 if(NOT PICO_PLATFORM STREQUAL "rp2040")
     message(STATUS "Using PICO_PIO_USE_GPIO_BASE=1 for non-rp2040 platforms.")
     target_compile_definitions(${projectname} PRIVATE
@@ -219,6 +239,7 @@ PRIVATE
     pico_lib
     tusb_xinput
     pico_shared
+    port
     .
 )
 add_subdirectory(pico_lib/dvi)
