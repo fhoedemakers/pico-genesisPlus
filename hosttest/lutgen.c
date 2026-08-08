@@ -24,6 +24,14 @@ int16_t *gwenesis_ym2612_buffer;
 int ym2612_index;
 int ym2612_clock;
 
+/* Normally provided by port/buffers.c, which this tool does not link. */
+void gwenesis_audio_report_clamp(const char *chip, int index, int target)
+{
+    (void)chip;
+    (void)index;
+    (void)target;
+}
+
 static char *emit_header(const char *name, const char *ctype,
                          const char *dims, const void *data, int count,
                          int is_unsigned, int elem_size)

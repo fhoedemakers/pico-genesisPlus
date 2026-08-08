@@ -34,7 +34,11 @@ typedef struct {
     uint16_t pad;
 } gwsnd_event_t;
 
-#define GWSND_FIFO_LEN 2048 /* power of two; 16 KB */
+/* Power of two. Core1 drains this every scanline (gwsnd_line_tick
+   publishes a watermark ~3.4 samples apart), so only a handful of events
+   are ever in flight; 1024 leaves ~2 frames of worst-case headroom at
+   8 KB. Watch gwsnd_stats_fifo_highwater() before shrinking further. */
+#define GWSND_FIFO_LEN 1024
 #define GWSND_FIFO_MASK (GWSND_FIFO_LEN - 1)
 
 typedef struct {
@@ -71,7 +75,14 @@ static inline int gwsnd_fifo_pop(gwsnd_fifo_t *f, gwsnd_event_t *out)
     uint32_t tail = f->tail;
     if (tail == f->head)
         return 0;
+    /* Order the payload read AFTER the head load: without this the entry
+       may be read before the producer published it, and on the ring's
+       first lap that yields an uninitialised timestamp — which drives the
+       chips far past the end of a frame and overruns the audio buffers. */
+    gwsnd_dmb();
     *out = f->ev[tail & GWSND_FIFO_MASK];
+    /* Keep the payload read ahead of publishing the new tail so the
+       producer cannot overwrite an entry still being read. */
     gwsnd_dmb();
     f->tail = tail + 1;
     return 1;

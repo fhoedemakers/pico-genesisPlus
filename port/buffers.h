@@ -25,6 +25,11 @@ bool init_emulator_mem(void);
    In HSTX offload mode, detach the core1 sound engine FIRST. */
 void free_emulator_mem(void);
 
+/* Verify the guard word past the end of every tracked buffer; reports and
+   returns the number that were overrun (0 = clean). Cheap enough to call
+   once per frame while chasing heap corruption. */
+int check_emulator_mem(const char *when);
+
 #ifdef __cplusplus
 }
 #endif

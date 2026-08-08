@@ -41,6 +41,7 @@ static int initialized = 0;
 unsigned char *Z80_RAM;
 
 static Z80 cpu;
+static int current_timeslice = 0;
 
 void ResetZ80(register Z80 *R);
 
@@ -79,12 +80,17 @@ void z80_start() {
     reset_once=0;
     bus_ack=0;
     zclk=0;
+    /* Upstream leaves this set: a stale bank from the previous game points
+       the Z80's 32 KB window at the wrong 68000 address, so a sound driver
+       reading its data through the bank (XGM sample playback) fetches
+       garbage on the second game started without a reboot. */
+    Z80_BANK=0;
+    current_timeslice=0;
 }
 
 void z80_pulse_reset() {
   ResetZ80(&cpu);
 }
-static int current_timeslice = 0;
 
 void GW_SRAM_FUNC(z80_run)(int target) {
 

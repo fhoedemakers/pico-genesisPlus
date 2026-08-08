@@ -645,6 +645,17 @@ void __not_in_flash_func(emulate)()
         frame++;
         rapidFireCounter++;
 
+        /* Heap-corruption watch: report the first frame in which any
+           emulator buffer's guard word is clobbered, then stop checking
+           so the log stays readable. */
+        static bool guardReported = false;
+        if (!guardReported && check_emulator_mem("in-game") > 0)
+        {
+            printf("  (frame %d, scan_line %d, screen %dx%d)\n", frame, scan_line,
+                   screen_width, screen_height);
+            guardReported = true;
+        }
+
         uint32_t tot_us = (uint32_t)(time_us_64() - t_frame0);
         dbgEmuSum += emu_us;
         dbgTotSum += tot_us;
@@ -798,7 +809,8 @@ int main()
             abSwapped = 0; // don't swap A and B buttons
             reset = resetGame = false;
             next_frame_time = 0; // Reset next frame time for FPS limiter
-            printf("Starting game (%d KB rom)\n", (int)(romSize / 1024));
+            printf("Starting game (%d KB rom) rom@%p\n", (int)(romSize / 1024),
+                   (void *)ROM_FILE_ADDR);
             if (!init_emulator_mem())
             {
                 snprintf(ErrorMessage, 40, "Out of memory starting game");
@@ -809,11 +821,26 @@ int main()
             load_cartridge((const unsigned char *)ROM_FILE_ADDR, romSize);
             power_on();
             reset_emulation();
+            Frens::dumpHeapStats("game start"); /* peak usage, both heaps */
             gwsnd_init(0 /* pal detected per frame */, HSTX);
             emulate();
             gwsnd_shutdown();
             free_emulator_mem();
         } while (resetGame);
+
+        /* Release the ROM before returning to the menu. Holding it while
+           the menu allocates (RomLister, artwork) leaves those blocks
+           sitting above it in PSRAM, so freeing it later — inside
+           loadRomInPsRam, immediately before allocating the next one —
+           can leave no contiguous room for a larger ROM and f_malloc
+           panics. Freeing here keeps the arena defragmented across games.
+           Only valid with PSRAM: without it ROM_FILE_ADDR points into XIP
+           flash, which must never be passed to free(). */
+        if (Frens::isPsramEnabled() && ROM_FILE_ADDR)
+        {
+            Frens::f_free((void *)ROM_FILE_ADDR);
+            ROM_FILE_ADDR = 0;
+        }
         selectedRom[0] = 0;
         showSplash = false;
     }

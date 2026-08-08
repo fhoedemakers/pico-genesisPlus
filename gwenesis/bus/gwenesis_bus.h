@@ -63,6 +63,16 @@ __license__ = "GPLv3"
    both audio buffers by ~5 samples. 1072 = 1061 rounded up with margin. */
 #define GWENESIS_AUDIO_BUFFER_LENGTH_PAL 1072
 
+/* Hard ceiling for the per-frame sample index of both chips. The chips
+   derive their index from caller-supplied master-clock timestamps
+   (index = target / AUDIO_FREQ_DIVISOR), so a timestamp beyond the end of
+   a frame writes past the audio buffers and corrupts the heap. Clamp
+   rather than trust the timestamp. */
+#define GWENESIS_AUDIO_BUFFER_MAX GWENESIS_AUDIO_BUFFER_LENGTH_PAL
+
+/* Reports the first clamp per chip (port/buffers.c). */
+void gwenesis_audio_report_clamp(const char *chip, int index, int target);
+
 /* Audio buffer length */
 
 enum mapped_address

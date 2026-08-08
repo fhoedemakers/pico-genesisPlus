@@ -232,6 +232,7 @@ void reset_emulation() {
   // Send a reset pulse to SEGA 315-5313 chip
   gwenesis_vdp_reset();
   gwenesis_SN76489_Reset();
+  gwenesis_io_reset();
 }
 
 /******************************************************************************

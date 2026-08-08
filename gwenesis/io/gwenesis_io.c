@@ -133,6 +133,33 @@ unsigned char io_reg[16] = {GWENESIS_IO_VERSION, /* 0x1 Version */
                              0xff,    0,    0,   /* PORT 2 */
                              0xff,    0,    0};  /* PORT 3 */
 
+/* Restore power-on I/O state. Upstream never resets this: io_reg and the
+   pad shadow are static initialisers only, so on a second game (started
+   without a reboot) the previous game's port direction/TH masks are still
+   latched and pad reads at boot return the wrong thing. */
+void gwenesis_io_reset(void)
+{
+    static const unsigned char io_reg_defaults[16] = {
+        GWENESIS_IO_VERSION,
+        0x7f, 0x7f, 0x7f,
+        0x00, 0x00, 0x00,
+        0xff,    0,    0,
+        0xff,    0,    0,
+        0xff,    0,    0};
+    /* Keep the region/version byte: set_region() configures it per ROM. */
+    unsigned char version = io_reg[0];
+    memcpy(io_reg, io_reg_defaults, sizeof(io_reg));
+    io_reg[0] = version;
+
+    gwenesis_io_pad_state[0] = 0x33;
+    gwenesis_io_pad_state[1] = 0x33;
+    gwenesis_io_pad_state[2] = 0x33;
+
+    button_state[0] = 0xff;
+    button_state[1] = 0xff;
+    button_state[2] = 0xff;
+}
+
 void gwenesis_io_pad_release_button(int pad, int button)
 {
     button_state[pad] |= (1 << button);

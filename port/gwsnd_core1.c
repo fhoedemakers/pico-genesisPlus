@@ -55,7 +55,9 @@ static uint32_t core1_epoch; /* core1 writes (FRAME_END event) */
 
 /* ---------------- core1 -> core0 sample bridge (I2S / VU) ------------- */
 
-#define GWSND_BRIDGE_LEN 2048 /* stereo frames, power of two, 8 KB */
+/* Stereo frames, power of two. Drained per scanline by gwsnd_line_tick,
+   so it holds a few samples at a time; 1024 (4 KB) is already generous. */
+#define GWSND_BRIDGE_LEN 1024
 static int16_t *bridge; /* [GWSND_BRIDGE_LEN][2] */
 static volatile uint32_t bridge_head, bridge_tail;
 
@@ -107,9 +109,18 @@ static inline void feed_up_to(int n)
 
 static void GW_SRAM_FUNC(gwsnd_core1_task)(void)
 {
-    if (!engine_attached)
-        return;
+    /* Claim the task BEFORE testing engine_attached, so the detach side
+       can never observe in_task==0 while this invocation is about to
+       touch the buffers. With the reverse order (test, then claim) core0
+       could pass its wait between our test and our claim, free the audio
+       buffers, and leave us writing into freed memory — which corrupted
+       the heap and hardfaulted the next free(). */
     in_task = 1;
+    gwsnd_dmb();
+    if (!engine_attached) {
+        in_task = 0;
+        return;
+    }
 
     /* Snapshot the watermark BEFORE draining: every event with
        ts <= this watermark was pushed (and made visible) before it was
@@ -176,7 +187,10 @@ static void GW_SRAM_FUNC(gwsnd_core1_task)(void)
 
 int gwsnd_offload_start(int is_pal)
 {
-    fifo.ev = malloc(GWSND_FIFO_LEN * sizeof(gwsnd_event_t));
+    /* Zeroed, not malloc'd: a timestamp read from an entry that was
+       never written must be harmless (ts 0 advances nothing) rather than
+       arbitrary. */
+    fifo.ev = calloc(GWSND_FIFO_LEN, sizeof(gwsnd_event_t));
     bridge = malloc(GWSND_BRIDGE_LEN * 2 * sizeof(int16_t));
     if (!fifo.ev || !bridge) {
         free(fifo.ev);
@@ -203,18 +217,28 @@ int gwsnd_offload_start(int is_pal)
 
 void gwsnd_offload_stop(void)
 {
-    video_output_set_background_task(NULL);
+    /* Order matters: clear the gate first so any invocation that starts
+       from here on bails out immediately, then detach the task, then
+       wait for an invocation already past the gate to finish. */
     engine_attached = 0;
-    /* Wait for a task invocation in flight to finish before freeing. */
-    absolute_time_t deadline = make_timeout_time_ms(5);
+    gwsnd_dmb();
+    video_output_set_background_task(NULL);
+
+    absolute_time_t deadline = make_timeout_time_ms(250);
     while (in_task && absolute_time_diff_us(get_absolute_time(), deadline) > 0) {
         tight_loop_contents();
     }
     if (fifo.drop_count) {
         printf("gwsnd: %u events dropped (FIFO overflow)\n", (unsigned)fifo.drop_count);
     }
-    free(fifo.ev);
-    free(bridge);
+    if (in_task) {
+        /* Core1 is wedged. Leaking these is bad, but freeing memory it may
+           still be writing to corrupts the heap — which is worse. */
+        printf("gwsnd: core1 task did not stop; leaking sound buffers\n");
+    } else {
+        free(fifo.ev);
+        free(bridge);
+    }
     fifo.ev = NULL;
     bridge = NULL;
 }

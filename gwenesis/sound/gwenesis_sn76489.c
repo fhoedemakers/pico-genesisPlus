@@ -216,6 +216,10 @@ if ( sn76489_clock >= target) return;
 
   int sn76489_prev_index = sn76489_index;
   sn76489_index += (target-sn76489_clock) / gwenesis_SN76489.divisor;
+  if (sn76489_index > GWENESIS_AUDIO_BUFFER_MAX) {
+    gwenesis_audio_report_clamp("psg", sn76489_index, target);
+    sn76489_index = GWENESIS_AUDIO_BUFFER_MAX;
+  }
   if (sn76489_index > sn76489_prev_index) {
     gwenesis_SN76489_Update(gwenesis_sn76489_buffer + sn76489_prev_index, sn76489_index-sn76489_prev_index);
     sn76489_clock = sn76489_index*gwenesis_SN76489.divisor;

@@ -64,8 +64,13 @@ static void gwenesis_frame_run(int draw_frame)
            progress up to its end (no-op in sync mode). */
         gwsnd_line_tick(system_clock + VDP_CYCLES_PER_LINE);
 
-        /* Video */
-        if (draw_frame)
+        /* Video. The clamp is not redundant: the host places the output
+           buffer using screen_height sampled at frame start, but the core
+           bounds its own writes with the LIVE REG1_PAL (240-line) bit. A
+           game toggling that bit mid-frame would render more lines than
+           the placement reserved and write past the end of the
+           framebuffer. */
+        if (draw_frame && scan_line < screen_height)
             gwenesis_vdp_render_line(scan_line);
 
         /* On these lines, the H-int line counter is reloaded */

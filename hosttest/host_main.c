@@ -10,6 +10,16 @@ the pico firmware, with the display in RGB565, and dumps:
 Usage:
     gen_host <rom.md|.bin|.gen> <total-frames> <dump-every-N> [outdir]
 
+Sequential-launch mode (reproduces "second game is broken" bugs, where
+state survives in the core between games because the firmware starts a new
+game without rebooting):
+
+    GEN_FIRST_ROM=<rom> gen_host <rom2> <frames> <dump-every> [outdir]
+
+runs <rom> to completion first, tears everything down exactly as the
+firmware does (gwsnd_shutdown + free_emulator_mem), then launches <rom2>.
+Its output must be byte-identical to launching <rom2> on its own.
+
 Input injection (frame ranges, inclusive):
     GEN_PRESS_START="120:180"   hold START on pad 0
     GEN_PRESS_A="200:220"       hold A on pad 0
@@ -180,6 +190,38 @@ int main(int argc, char **argv)
     parse_press("GEN_PRESS_A", 6);
     parse_press("GEN_PRESS_C", 5);
     parse_press("GEN_PRESS_B", 4);
+
+    /* Optional warm-up launch: run a different game first and tear it
+       down, so this run starts from whatever state the core left behind. */
+    const char *first_rom = getenv("GEN_FIRST_ROM");
+    if (first_rom && *first_rom) {
+        size_t first_size = 0;
+        const unsigned char *first = load_rom(first_rom, &first_size);
+        if (!first)
+            return 1;
+        printf("=== warm-up launch: %s ===\n", first_rom);
+        if (!init_emulator_mem()) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+        load_cartridge(first, first_size);
+        power_on();
+        reset_emulation();
+        gwsnd_init(0, 0);
+        for (int f = 0; f < 300; f++) {
+            current_frame_no = f;
+            gwsnd_set_pal(gwenesis_frame_get_config());
+            int m = (FB_H - screen_height) / 2;
+            gwenesis_vdp_set_buffer(&framebuffer[m * FB_W]);
+            gwenesis_frame_run(1);
+        }
+        /* Exactly the firmware's teardown order. */
+        gwsnd_shutdown();
+        free_emulator_mem();
+        memset(framebuffer, 0, sizeof(framebuffer));
+        free((void *)first);
+        printf("=== warm-up done, now launching %s ===\n", rom_path);
+    }
 
     size_t rom_size = 0;
     const unsigned char *rom = load_rom(rom_path, &rom_size);

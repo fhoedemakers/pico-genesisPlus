@@ -167,6 +167,8 @@ void gwenesis_vdp_reset() {
   gwenesis_vdp_status = 0x3C00;
   // //line_counter_interrupt = 0;
   hvcounter_latched = 0;
+  hvcounter_latch = 0;
+  memset(fifo, 0, sizeof(fifo));
 
   // register the M68K interrupt
   m68k_set_int_ack_callback(m68k_irq_acked);

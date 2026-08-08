@@ -89,6 +89,13 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
   and falls back to full `RdZ80` decode above.
 
 ### `sound/z80inst.c`
+- **Bug fix**: `z80_start()` did not clear `Z80_BANK` (or `current_timeslice`).
+  The firmware starts a new game without rebooting, so the previous game's
+  bank left the Z80's 32 KB window into 68000 space pointing at the wrong
+  address — a sound driver reading its samples through that window (XGM)
+  got garbage, and Xeno Crisis launched as a second game showed a black
+  screen. Upstream masks this with an `assert(0)` in
+  `gwenesis_bus_map_z80_address` that is compiled out on the Pico.
 - **Bug fix** (carried over from the old port): the Z80 RESET register
   handler pulsed the Z80 on *every* non-zero write; SGDK writes this
   register repeatedly (`Z80_getAndRequestBus` polling), restarting the
@@ -119,6 +126,14 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
 - Audio buffer externs become pointers under `GWENESIS_PICO` (allocated
   per game by `port/buffers.c`).
 
+### Audio buffer bounds (both chips)
+- `ym2612_run()` / `gwenesis_SN76489_run()` clamp the per-frame sample
+  index to `GWENESIS_AUDIO_BUFFER_MAX`. Both derive the index from a
+  caller-supplied master-clock timestamp, so a bad timestamp wrote past
+  the audio buffers and corrupted the heap — a failure that only surfaced
+  much later inside malloc/free. `gwenesis_audio_report_clamp()` (port)
+  prints the offending index/timestamp once per chip.
+
 ### `sound/gwenesis_sn76489.c`
 - **Bug fix**: `WhiteNoiseFeedback` was never initialized, so the noise
   LFSR shifted in zeros and the white-noise channel (drums, waves,
@@ -132,8 +147,18 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
   `PZSTable`, ~1.8 KB). `DAATable` (4 KB) stays in flash — the DAA
   opcode is rare.
 
+### `io/gwenesis_io.c`
+- **Bug fix**: new `gwenesis_io_reset()` (called from `reset_emulation()`).
+  `io_reg[]` and the pad shadow were static initialisers only and never
+  re-initialised, so a second game inherited the previous game's port
+  direction / TH-select masks and mis-read the pads at boot (Space
+  Invaders '91 rendered corrupt when launched after another game). The
+  region/version byte is preserved because `set_region()` sets it per ROM.
+
 ### `vdp/gwenesis_vdp_mem.c`
 - `VRAM` → extern pointer (port-allocated).
+- `gwenesis_vdp_reset()` also clears `fifo[]` and `hvcounter_latch`, which
+  upstream missed (same inter-game staleness class as the two above).
 - The 4 inline CRAM→RGB565 conversions → `GWENESIS_CRAM_TO_PIXEL()`
   (format selected by `GWENESIS_PIXEL_FMT`).
 - `GW_SRAM_FUNC` on `gwenesis_vdp_vram_write`, `gwenesis_vdp_hcounter`,
@@ -172,3 +197,10 @@ PPM frames and per-chip WAVs, regenerates and diffs the LUT headers
 (`port/gwsnd_shadow.c`) in lockstep with the real chip — proven bit-exact
 over ~950,000 status reads across Sonic 1/3, Xeno Crisis, Streets of Rage
 2, Gunstar Heroes, Thunder Force IV and Columns.
+
+`GEN_FIRST_ROM=<rom> gen_host <rom2> …` runs one game, tears it down in
+the firmware's exact order, then launches a second — the condition that
+exposed the inter-game state bugs above. A second game's output must be
+byte-identical to launching it alone; the fixes were confirmed by
+reproducing the corruption with them disabled and then verifying a
+4x4 warm-up/second-game matrix.

@@ -4,6 +4,7 @@ port/buffers.c — see buffers.h.
 Also defines the frame-loop globals the core expects the host to own
 (scan_line, frame_counter, system_clock).
 */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -44,15 +45,84 @@ int system_clock;
 static void *ym_tl_ram, *ym_sin_ram, *ym_lfo_ram;
 #endif
 
+/* Called by the sound chips when a caller-supplied timestamp would have
+   pushed the per-frame sample index past the end of the audio buffers.
+   Reports once per chip per game: the index and timestamp identify how
+   far out of range the driving clock went. */
+void gwenesis_audio_report_clamp(const char *chip, int index, int target)
+{
+    static int reported_ym, reported_psg;
+    int *seen = (chip[0] == 'y') ? &reported_ym : &reported_psg;
+    if (*seen)
+        return;
+    *seen = 1;
+    printf("AUDIO CLAMP: %s index=%d (max %d) target=%d frame=%d line=%d\n",
+           chip, index, GWENESIS_AUDIO_BUFFER_MAX, target, frame_counter, scan_line);
+}
+
+/* Every buffer is allocated with a trailing guard word. An emulator-side
+   overrun would otherwise land on malloc's chunk header and only surface
+   much later as a corrupt free list (a hard fault deep inside
+   malloc/free/mallinfo), which is impossible to attribute. Checking the
+   guards names the culprit at the moment it is detected. */
+#define GUARD_MAGIC 0xA5C3F00Du
+#define GUARD_BYTES 4
+
+typedef struct {
+    void *ptr;
+    size_t size;
+    const char *name;
+} tracked_buf_t;
+
+static tracked_buf_t tracked[10];
+static int tracked_count;
+
+static void *alloc_or_report(size_t size, const char *what)
+{
+    void *p = malloc(size + GUARD_BYTES);
+    if (!p) {
+        printf("init_emulator_mem: SRAM alloc of %u bytes for %s FAILED\n",
+               (unsigned)size, what);
+        return NULL;
+    }
+    *(volatile uint32_t *)((uint8_t *)p + size) = GUARD_MAGIC;
+    if (tracked_count < (int)(sizeof(tracked) / sizeof(tracked[0]))) {
+        tracked[tracked_count].ptr = p;
+        tracked[tracked_count].size = size;
+        tracked[tracked_count].name = what;
+        tracked_count++;
+    }
+    return p;
+}
+
+/* Returns the number of buffers whose guard word was clobbered. */
+int check_emulator_mem(const char *when)
+{
+    int bad = 0;
+    for (int i = 0; i < tracked_count; i++) {
+        if (!tracked[i].ptr)
+            continue;
+        uint32_t g = *(volatile uint32_t *)((uint8_t *)tracked[i].ptr + tracked[i].size);
+        if (g != GUARD_MAGIC) {
+            printf("HEAP GUARD CLOBBERED (%s): %s overran, guard=%08x\n",
+                   when, tracked[i].name, (unsigned)g);
+            bad++;
+        }
+    }
+    return bad;
+}
+
 bool init_emulator_mem(void)
 {
     free_emulator_mem();
 
-    M68K_RAM = malloc(MAX_RAM_SIZE);
-    ZRAM = malloc(MAX_Z80_RAM_SIZE);
-    VRAM = malloc(VRAM_MAX_SIZE);
-    gwenesis_ym2612_buffer = malloc(GWENESIS_AUDIO_BUFFER_LENGTH_PAL * sizeof(int16_t));
-    gwenesis_sn76489_buffer = malloc(GWENESIS_AUDIO_BUFFER_LENGTH_PAL * sizeof(int16_t));
+    M68K_RAM = alloc_or_report(MAX_RAM_SIZE, "M68K_RAM");
+    ZRAM = alloc_or_report(MAX_Z80_RAM_SIZE, "ZRAM");
+    VRAM = alloc_or_report(VRAM_MAX_SIZE, "VRAM");
+    gwenesis_ym2612_buffer =
+        alloc_or_report(GWENESIS_AUDIO_BUFFER_LENGTH_PAL * sizeof(int16_t), "ym buffer");
+    gwenesis_sn76489_buffer =
+        alloc_or_report(GWENESIS_AUDIO_BUFFER_LENGTH_PAL * sizeof(int16_t), "psg buffer");
 
     if (!M68K_RAM || !ZRAM || !VRAM || !gwenesis_ym2612_buffer || !gwenesis_sn76489_buffer) {
         free_emulator_mem();
@@ -60,9 +130,9 @@ bool init_emulator_mem(void)
     }
 
 #if defined(GWENESIS_LUTS_IN_RAM) && GWENESIS_LUTS_IN_RAM != 0
-    ym_tl_ram = malloc(YM2612_TL_TAB_BYTES);
-    ym_sin_ram = malloc(YM2612_SIN_TAB_BYTES);
-    ym_lfo_ram = malloc(YM2612_LFO_PM_TABLE_BYTES);
+    ym_tl_ram = alloc_or_report(YM2612_TL_TAB_BYTES, "ym tl_tab");
+    ym_sin_ram = alloc_or_report(YM2612_SIN_TAB_BYTES, "ym sin_tab");
+    ym_lfo_ram = alloc_or_report(YM2612_LFO_PM_TABLE_BYTES, "ym lfo_pm_table");
     if (!ym_tl_ram || !ym_sin_ram || !ym_lfo_ram) {
         free_emulator_mem();
         return false;
@@ -80,6 +150,9 @@ bool init_emulator_mem(void)
 
 void free_emulator_mem(void)
 {
+    if (tracked_count)
+        check_emulator_mem("free");
+    tracked_count = 0;
     free(M68K_RAM);
     free(ZRAM);
     free(VRAM);
