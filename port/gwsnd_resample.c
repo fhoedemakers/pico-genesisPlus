@@ -52,14 +52,21 @@ void gwsnd_resample_reset(int is_pal)
 
 void gwsnd_set_fill_permille(int permille)
 {
-    /* Proportional trim, clamped to +/-0.5%. Queue above target -> step
-       up (each output consumes more input -> fewer output samples per
-       frame -> queue drains); below target -> step down. */
+    /* Proportional trim, clamped to +/-1%. Queue above target -> step up
+       (each output consumes more input -> fewer output samples per frame
+       -> queue drains); below target -> step down.
+       0.5% was too weak to matter: it moves the backlog ~0.9 packets per
+       frame, while a single frame that overruns its period costs ~20, so
+       a run of heavy frames walked the queue empty faster than the trim
+       could refill it. 1% is ~1.8 packets/frame, and the caller only asks
+       for full authority when the level is far off target, so the pitch
+       deviation is a transient during recovery rather than a steady
+       detune. */
     int err = permille - 1000;
     if (err > 500) err = 500;
     if (err < -500) err = -500;
-    /* base/1000 * err/500 * 5 => max +/-0.5% */
-    int32_t trim = (int32_t)((int64_t)base_step_q16 * err / 100000);
+    /* base/1000 * err/500 * 10 => max +/-1% */
+    int32_t trim = (int32_t)((int64_t)base_step_q16 * err / 50000);
     step_q16 = base_step_q16 + trim;
 }
 
@@ -72,7 +79,13 @@ static inline int16_t sat16(int32_t v)
 
 void GW_SRAM_FUNC(gwsnd_resample_mix_feed)(int from, int to)
 {
-    if (!output_fn)
+    /* Snapshot the sink: in offload mode this runs on core1 while core0
+       may swap it (headphone hot-plug, audio toggled off), and reloading
+       it per sample would let a chunk be split across two sinks or call
+       through a NULL that appeared mid-loop. Same pattern as
+       gwsnd_bridge_drain(). */
+    void (*out)(int16_t, int16_t) = output_fn;
+    if (!out)
         return;
     const int16_t *ym = gwenesis_ym2612_buffer;
     const int16_t *sn = gwenesis_sn76489_buffer;
@@ -84,8 +97,8 @@ void GW_SRAM_FUNC(gwsnd_resample_mix_feed)(int from, int to)
         /* Emit every output sample whose position falls before s. */
         while (phase_q16 < 0x10000u) {
             int32_t d = (int32_t)s - (int32_t)last_in;
-            int16_t out = (int16_t)(last_in + ((d * (int32_t)phase_q16) >> 16));
-            output_fn(out, out);
+            int16_t s_out = (int16_t)(last_in + ((d * (int32_t)phase_q16) >> 16));
+            out(s_out, s_out);
             phase_q16 += step_q16;
         }
         phase_q16 -= 0x10000u;

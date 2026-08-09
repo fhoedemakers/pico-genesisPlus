@@ -444,8 +444,39 @@ extern "C" void gwenesis_io_get_buttons()
 
 static bool i2sActive = false;
 
+/* Samples actually handed to the I2S ring, per perf window. The ring sits
+   near empty even with the drift trim saturated asking for more output,
+   which it cannot do if samples are arriving at the nominal rate — so
+   compare this against 44100/s to tell "we are losing samples upstream"
+   from "the DAC is draining faster than we produce". */
+static uint32_t dbgI2sSamples = 0;
+
+#if EXT_AUDIO_IS_ENABLED
+/* I2S ring fill, published as one word for the drift trim.
+   audio_i2s_get_fill_permille() derives the level from write_index and
+   read_index, which it reads as two separate words. The DMA IRQ advances
+   read_index in jumps of DMA_BLOCK_SIZE, so any reader that straddles an
+   update gets a negative difference that the ring mask turns into
+   "almost full". With the ring legitimately near empty the two indices
+   sit close together and that straddle is common — and it tells the trim
+   to produce *less*, which empties the ring further and makes the next
+   straddle more likely. Sampling it here with interrupts held, and
+   handing core1 a single aligned word, removes both the IRQ race and the
+   cross-core one. */
+static volatile int i2sFillPermille = 0;
+
+static inline void publishI2sFill()
+{
+    uint32_t save = save_and_disable_interrupts();
+    int permille = audio_i2s_get_fill_permille();
+    restore_interrupts(save);
+    i2sFillPermille = permille;
+}
+#endif
+
 static void audioOutI2S(int16_t l, int16_t r)
 {
+    dbgI2sSamples++;
     EXT_AUDIO_ENQUEUE_SAMPLE(l, r);
 #if ENABLE_VU_METER
     if (settings.flags.enableVUMeter)
@@ -497,43 +528,150 @@ static void audioOutDVI(int16_t l, int16_t r)
 }
 #endif
 
-/* Sink backlog in permille of its target (1000 = on target), used by the
-   resampler's drift trim. In offload mode this runs on CORE1 — it only
-   reads volatile counters. */
+/* Backlog the drift trim aims to hold in each sink. Two things eat into
+   it. Within a frame, core1 may only synthesize up to the per-line
+   watermark core0 publishes, so a paced chunk is a small hole (~23
+   packets / ~92 frames). Across frames, a scene that takes longer than
+   the frame period to emulate produces 735 samples while the sink drains
+   more, costing ~20 packets a frame, and the trim can only claw that back
+   at ~1.8 packets a frame — so a run of heavy frames walks the level
+   down. The target has to cover that walk, not just the intra-frame hole:
+   at 96 packets the walk still reached zero and spliced in silence. */
+#if HSTX
+#define DI_TARGET_PACKETS 160 /* 640 samples, 14.5 ms, of a 256-packet ring */
+#endif
+#if EXT_AUDIO_IS_ENABLED
+#define I2S_TARGET_FRAMES (I2S_AUDIO_RING_SIZE / 2) /* 512, 11.6 ms */
+#endif
+
+/* Backlog error for the resampler's drift trim, as permille where 1000 is
+   on target. In offload mode this runs on CORE1 — it only reads volatile
+   counters.
+
+   Sensitivity is fixed per packet rather than expressed as a ratio of the
+   target, so the loop does not get sluggish just because the target grew:
+   25 permille/packet saturates the trim 20 packets off target. Inside
+   that band the correction is gentle (no audible pitch drift when the
+   level is merely wandering); beyond it the trim runs flat out, which is
+   what a walk from a run of heavy frames needs. */
 static int sinkFillPermille()
 {
 #if EXT_AUDIO_IS_ENABLED
     if (i2sActive)
     {
-        return audio_i2s_get_fill_permille() * 2; /* target: ring half full */
+        int used = i2sFillPermille * I2S_AUDIO_RING_SIZE / 1000;
+        return 1000 + (used - I2S_TARGET_FRAMES) * 6; /* saturates ~80 frames off */
     }
 #endif
 #if HSTX
-    return (int)(hstx_di_queue_get_level() * 1000 / 64); /* target: 64 of 256 packets */
+    return 1000 + ((int)hstx_di_queue_get_level() - DI_TARGET_PACKETS) * 25;
 #else
     auto &ring = dvi_->getAudioRingBuffer();
     int fill = AUDIOBUFFERSIZE - (int)ring.getWritableSize();
-    return fill * 1000 / (AUDIOBUFFERSIZE / 2); /* target: ring half full */
+    /* Target: ring half full. Halved against the obvious
+       fill*1000/(AUDIOBUFFERSIZE/2) because gwsnd_set_fill_permille's
+       authority was doubled for the HSTX sinks — PicoDVI's panel runs off
+       its own clock and leans on this trim continuously, so its effective
+       response must stay exactly where it was rather than detune twice as
+       hard. */
+    return 1000 + (fill - AUDIOBUFFERSIZE / 2) * 1000 / AUDIOBUFFERSIZE;
 #endif
 }
 
-static void selectAudioSink()
+/* Fill the selected sink up to its target with silence. The drift trim
+   only moves ~3.7 samples per frame, so a sink that starts empty would
+   spend seconds underrunning before it reached target on its own.
+
+   The I2S ring is core0-owned in both modes, so priming it is always
+   safe. The HDMI ring is not: once the core1 sound engine is attached it
+   is the single producer of hstx_push_audio_sample(), and a second
+   producer can lose an island. Prime HDMI only before gwsnd_init(), when
+   no background task is installed — a mid-game sink switch lets the
+   drift trim fill in instead. */
+static void primeAudioSink()
 {
     if (!audio_enabled)
+    {
+        return;
+    }
+#if EXT_AUDIO_IS_ENABLED
+    if (i2sActive)
+    {
+        publishI2sFill();
+        for (int i = i2sFillPermille * I2S_AUDIO_RING_SIZE / 1000; i < I2S_TARGET_FRAMES; i++)
+        {
+            EXT_AUDIO_ENQUEUE_SAMPLE(0, 0);
+        }
+        publishI2sFill();
+        return;
+    }
+#endif
+#if HSTX
+    /* Whole packets only: hstx_push_audio_sample batches 4 samples. */
+    for (uint32_t p = hstx_di_queue_get_level(); p < DI_TARGET_PACKETS; p++)
+    {
+        for (int s = 0; s < 4; s++)
+        {
+            hstx_push_audio_sample(0, 0);
+        }
+    }
+#endif
+}
+
+enum SinkKind
+{
+    SINK_UNSET = -1,
+    SINK_NONE,
+    SINK_I2S,
+    SINK_DIRECT
+};
+static SinkKind selectedSink = SINK_UNSET;
+
+/* Force the next selectAudioSink() to re-store and re-prime; call when a
+   game starts, since the sinks were torn down with the previous one. */
+static void resetAudioSinkSelection() { selectedSink = SINK_UNSET; }
+
+/* Called once per frame. The resampler runs on core1 and reloads the sink
+   pointer per sample, so only ever store when the selection actually
+   changed — an unconditional rewrite every frame is a swap core1 can land
+   in the middle of. */
+static void selectAudioSink()
+{
+    SinkKind want = SINK_DIRECT;
+    if (!audio_enabled)
+    {
+        want = SINK_NONE;
+    }
+#if EXT_AUDIO_IS_ENABLED
+    else if (settings.flags.useExtAudio == 1 || Frens::isHeadPhoneJackConnected())
+    {
+        want = SINK_I2S;
+    }
+#endif
+
+    if (want == selectedSink)
+    {
+        return;
+    }
+    selectedSink = want;
+
+    if (want == SINK_NONE)
     {
         i2sActive = false;
         gwsnd_set_output(nullptr);
         return;
     }
 #if EXT_AUDIO_IS_ENABLED
-    if (settings.flags.useExtAudio == 1 || Frens::isHeadPhoneJackConnected())
+    if (want == SINK_I2S)
     {
         i2sActive = true;
 #if HSTX
         /* resampler runs on core1: hand samples to core0 via the bridge */
-        gwsnd_set_output(gwsnd_bridge_push);
         gwsnd_set_bridge_sink(audioOutI2S);
+        primeAudioSink();
+        gwsnd_set_output(gwsnd_bridge_push);
 #else
+        primeAudioSink();
         gwsnd_set_output(audioOutI2S);
 #endif
         return;
@@ -541,12 +679,104 @@ static void selectAudioSink()
 #endif
     i2sActive = false;
 #if HSTX
-    gwsnd_set_output(audioOutHstx);
     gwsnd_set_bridge_sink(bridgeVUOnly);
+    gwsnd_set_output(audioOutHstx);
 #else
+    primeAudioSink();
     gwsnd_set_output(audioOutDVI);
 #endif
 }
+
+/* Game-start sequence: pick the sink and fill it before gwsnd_init()
+   attaches the core1 engine, so HDMI priming has the ring to itself. */
+static void startAudioSinks()
+{
+    resetAudioSinkSelection();
+    selectAudioSink();
+    primeAudioSink();
+}
+
+/* ------------------------------------------------------------------ */
+/* Sub-frame pacing.                                                   */
+/*                                                                     */
+/* Emulating all 262 lines flat out (~7 ms) and then idling in the      */
+/* frame pacer (~9.6 ms) leaves a hole in audio production for well     */
+/* over half of every frame: core1 may only synthesize up to the        */
+/* watermark core0 publishes per line, and during the idle tail that    */
+/* watermark is already at the frame end. The sink drains 44.1          */
+/* samples/ms straight through the hole and hits empty. Spreading the   */
+/* same wall-clock budget across the frame in 32-line chunks caps the   */
+/* hole at ~2.1 ms (~92 samples) without costing a single byte of the   */
+/* buffer growth that would otherwise be needed to ride it out.         */
+/* ------------------------------------------------------------------ */
+
+static uint64_t frame_start_time = 0; /* wall clock the current frame began */
+static uint32_t frame_period_us = 16667;
+
+#define PACE_LINE_CHUNK 32
+
+#if HSTX
+/* Backlog watch for the perf overlay. Sampled at the end of every paced
+   chunk — the moment production has been stalled longest, so this is the
+   actual trough. Sampling once per frame instead always lands at the same
+   phase and cannot see it. */
+static uint32_t dbgDiMin = UINT32_MAX, dbgDiMax = 0;
+
+static inline void __not_in_flash_func(noteDiLevel)()
+{
+    uint32_t di = hstx_di_queue_get_level();
+    if (di < dbgDiMin)
+        dbgDiMin = di;
+    if (di > dbgDiMax)
+        dbgDiMax = di;
+}
+#endif
+
+static void __not_in_flash_func(paceScanline)(int line, int lines_per_frame)
+{
+    if (!limit_fps || (line & (PACE_LINE_CHUNK - 1)) != 0 || line >= lines_per_frame)
+    {
+        return;
+    }
+    uint64_t deadline = frame_start_time +
+                        (uint64_t)frame_period_us * (uint32_t)line / (uint32_t)lines_per_frame;
+    uint64_t now = time_us_64();
+    if (now >= deadline)
+    {
+        return; /* behind schedule: never stretch a late frame */
+    }
+#if HSTX
+    /* Drain the core1->core0 sample bridge (I2S / VU) before parking: a
+       chunk is at most ~2.1 ms, i.e. ~92 frames into a 1024-frame ring,
+       so once at the top of the wait is plenty. */
+    gwsnd_bridge_drain();
+#endif
+    /* Same shape as the end-of-frame limiter below: sleep the bulk, spin
+       the last 150 us. Spinning the whole ~9.6 ms a frame would burn
+       power for nothing. */
+    uint64_t remaining = deadline - now;
+    if (remaining > 150)
+    {
+        sleep_us(remaining - 150);
+    }
+    while (time_us_64() < deadline)
+    {
+        tight_loop_contents();
+    }
+#if HSTX
+    noteDiLevel();
+#endif
+#if EXT_AUDIO_IS_ENABLED
+    /* Refresh the level the core1 trim reads, so it is at most one paced
+       chunk stale rather than a whole frame. */
+    if (i2sActive)
+    {
+        publishI2sFill();
+    }
+#endif
+}
+
+#define GWENESIS_LINE_PACE(line, lines_per_frame) paceScanline((line), (lines_per_frame))
 
 /* ------------------------------------------------------------------ */
 /* Frame loop: shared verbatim with the host harness.                  */
@@ -593,15 +823,32 @@ void __not_in_flash_func(emulate)()
 
     /* Perf diagnostics, printed once per second while the SELECT+DOWN
        debug toggle is on: core work time per frame (emulation vs whole
-       pre-pacing loop), sound FIFO high-water/drops, DI queue level. */
+       pre-pacing loop), sound FIFO high-water/drops, DI queue min/max and
+       underruns. The DI level is sampled every frame and reported as a
+       range — a single instantaneous read once per second lands at a
+       random point on the sawtooth and says nothing. */
     uint32_t dbgEmuSum = 0, dbgEmuMax = 0, dbgTotSum = 0, dbgTotMax = 0, dbgFrames = 0;
     uint64_t dbgLastPrint = time_us_64();
+#if HSTX
+    uint32_t dbgUnderrunBase = hstx_di_queue_get_underrun_count();
+    dbgDiMin = UINT32_MAX;
+    dbgDiMax = 0;
+#endif
 
     while (!reset)
     {
         uint64_t t_frame0 = time_us_64();
         int is_pal = gwenesis_frame_get_config();
         gwsnd_set_pal(is_pal);
+
+        /* Pace off the FPS limiter's own deadline so sub-frame chunks and
+           the end-of-frame wait share one timebase; on the first frame (and
+           after a catch-up jump) fall back to now, which makes every chunk
+           deadline already past and the pacing a no-op for that frame. */
+        frame_period_us = is_pal ? 20000 : 16667;
+        frame_start_time = (next_frame_time > frame_period_us)
+                               ? next_frame_time - frame_period_us
+                               : t_frame0;
         if (firstLoop || old_screen_height != screen_height || old_screen_width != screen_width)
         {
             printf("Uptime %s, is_pal %d, screen_width: %d, screen_height: %d, audio_enabled: %d, frameskip: %d\n",
@@ -664,6 +911,16 @@ void __not_in_flash_func(emulate)()
         if (tot_us > dbgTotMax)
             dbgTotMax = tot_us;
         dbgFrames++;
+#if HSTX
+        /* Covers the inter-frame gap; paceScanline covers within a frame. */
+        noteDiLevel();
+#endif
+#if EXT_AUDIO_IS_ENABLED
+        if (i2sActive)
+        {
+            publishI2sFill();
+        }
+#endif
         if (toggleDebugFPS && (time_us_64() - dbgLastPrint) >= 1000000)
         {
             printf("perf: frames=%u emu avg=%u max=%u us, loop avg=%u max=%u us",
@@ -674,11 +931,32 @@ void __not_in_flash_func(emulate)()
                    gwsnd_stats_drops());
 #endif
 #if HSTX
-            printf(", di=%u resync=%d", (unsigned)hstx_di_queue_get_level(),
-                   get_video_output_resync_count());
+            uint32_t underruns = hstx_di_queue_get_underrun_count();
+            printf(", di=%u/%u underruns=%u resync=%d",
+                   (unsigned)(dbgDiMin == UINT32_MAX ? 0 : dbgDiMin), (unsigned)dbgDiMax,
+                   (unsigned)(underruns - dbgUnderrunBase), get_video_output_resync_count());
+            dbgUnderrunBase = underruns;
+#endif
+#if EXT_AUDIO_IS_ENABLED
+            if (i2sActive)
+            {
+                /* i2s_in is samples/s reaching the ring: ~44100 means the
+                   loss is downstream (DAC too fast), well under means we
+                   are not producing/delivering them in the first place. */
+                printf(", i2s=%u%% i2s_in=%u", (unsigned)(i2sFillPermille / 10),
+                       (unsigned)dbgI2sSamples);
+            }
+            dbgI2sSamples = 0;
+#endif
+#if GWSND_OFFLOAD
+            printf(" bridge_drops=%u", gwsnd_stats_bridge_drops());
 #endif
             printf("\n");
             dbgEmuSum = dbgEmuMax = dbgTotSum = dbgTotMax = dbgFrames = 0;
+#if HSTX
+            dbgDiMin = UINT32_MAX;
+            dbgDiMax = 0;
+#endif
             dbgLastPrint = time_us_64();
         }
         else if (!toggleDebugFPS && dbgFrames >= 600)
@@ -686,12 +964,19 @@ void __not_in_flash_func(emulate)()
             /* keep the accumulators fresh so enabling the toggle shows
                recent numbers, not an average since game start */
             dbgEmuSum = dbgEmuMax = dbgTotSum = dbgTotMax = dbgFrames = 0;
+#if HSTX
+            dbgDiMin = UINT32_MAX;
+            dbgDiMax = 0;
+            dbgUnderrunBase = hstx_di_queue_get_underrun_count();
+#endif
             dbgLastPrint = time_us_64();
         }
 
         if (limit_fps)
         {
-            const uint64_t frame_period = is_pal ? 20000 : 16667; // 50Hz or 60Hz
+            // Same period the sub-frame pacer divides up, so the last
+            // chunk deadline and this one cannot disagree.
+            const uint64_t frame_period = frame_period_us; // 50Hz or 60Hz
             const uint64_t now = time_us_64();
 
             // Initialize first deadline
@@ -822,6 +1107,7 @@ int main()
             power_on();
             reset_emulation();
             Frens::dumpHeapStats("game start"); /* peak usage, both heaps */
+            startAudioSinks();                  /* must precede gwsnd_init */
             gwsnd_init(0 /* pal detected per frame */, HSTX);
             emulate();
             gwsnd_shutdown();

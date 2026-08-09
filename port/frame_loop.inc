@@ -17,6 +17,18 @@ Contract:
     tops up the sound chips via gwsnd_frame_end() and rebases the clocks.
 */
 
+/* Sub-frame pacing hook, called after every completed scanline with the
+   line count so far and the frame's total. The pico build uses it to
+   spread the frame's wall-clock budget across the frame instead of
+   emulating flat out and then idling: core1 may only synthesize up to the
+   watermark core0 publishes per line, so an idle tail at the end of the
+   frame is a hole in audio production that drains the sink dry. No-op
+   everywhere else, so the host harness still runs at full speed and its
+   output stays bit-identical. */
+#ifndef GWENESIS_LINE_PACE
+#define GWENESIS_LINE_PACE(line, lines_per_frame) ((void)0)
+#endif
+
 /* Core globals not exported through headers. */
 extern unsigned char gwenesis_vdp_regs[];
 extern unsigned short gwenesis_vdp_status;
@@ -101,6 +113,10 @@ static void gwenesis_frame_run(int draw_frame)
             z80_irq_line(0);
 
         system_clock += VDP_CYCLES_PER_LINE;
+
+        /* After gwsnd_line_tick published this line's watermark, so the
+           sound engine has work to do while the pacer waits. */
+        GWENESIS_LINE_PACE(scan_line, gwenesis_frame_lines_per_frame);
     }
 
     /* Top up both sound chips to the frame boundary, emit the frame's

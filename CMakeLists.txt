@@ -163,6 +163,13 @@ if(GPIOHSTXD0 AND GPIOHSTXD1 AND GPIOHSTXD2 AND GPIOHSTXCK)
     # HSTX: sound synthesis is offloaded to core1 (the pico_hdmi background
     # task); core0 keeps a shadow of the YM2612 timers for status reads.
     target_compile_definitions(${projectname} PUBLIC GWSND_OFFLOAD=1)
+    # The audio backlog is held at DI_TARGET_PACKETS (160) so a run of
+    # heavy frames cannot walk the data-island ring empty and splice in
+    # silence packets. The driver's default drop watermark of 200 sits too
+    # close to that: peaks would be discarded instead, trading underruns
+    # for dropped samples. Raise it; the ring is 256 entries and this is a
+    # threshold only, so it costs no memory.
+    target_compile_definitions(${projectname} PUBLIC HSTX_AUDIO_DI_HIGH_WATERMARK=240)
     target_sources(${projectname} PRIVATE port/gwsnd_core1.c)
 else()
     target_compile_definitions(${projectname} PUBLIC GWENESIS_PIXEL_FMT=444)

@@ -60,14 +60,17 @@ static uint32_t core1_epoch; /* core1 writes (FRAME_END event) */
 #define GWSND_BRIDGE_LEN 1024
 static int16_t *bridge; /* [GWSND_BRIDGE_LEN][2] */
 static volatile uint32_t bridge_head, bridge_tail;
+static volatile uint32_t bridge_drops; /* silently discarded samples */
 
 void GW_SRAM_FUNC(gwsnd_bridge_push)(int16_t l, int16_t r)
 {
     if (!bridge)
         return;
     uint32_t head = bridge_head;
-    if (head - bridge_tail >= GWSND_BRIDGE_LEN)
-        return; /* core0 not draining (menu open) — drop */
+    if (head - bridge_tail >= GWSND_BRIDGE_LEN) {
+        bridge_drops++; /* core0 not draining (menu open) — drop */
+        return;
+    }
     bridge[(head & (GWSND_BRIDGE_LEN - 1)) * 2] = l;
     bridge[(head & (GWSND_BRIDGE_LEN - 1)) * 2 + 1] = r;
     gwsnd_dmb();
@@ -315,4 +318,11 @@ unsigned int gwsnd_stats_fifo_highwater(void)
 unsigned int gwsnd_stats_drops(void)
 {
     return fifo.drop_count;
+}
+
+unsigned int gwsnd_stats_bridge_drops(void)
+{
+    unsigned int d = bridge_drops;
+    bridge_drops = 0;
+    return d;
 }

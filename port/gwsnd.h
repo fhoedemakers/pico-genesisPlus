@@ -85,6 +85,10 @@ void gwsnd_bridge_drain(void);
    last call (self-resetting) and total dropped events. */
 unsigned int gwsnd_stats_fifo_highwater(void);
 unsigned int gwsnd_stats_drops(void);
+/* Samples the core1->core0 bridge discarded because core0 stopped
+   draining; read-and-reset. Nonzero means the I2S/VU path is losing
+   audio upstream of the I2S ring. */
+unsigned int gwsnd_stats_bridge_drops(void);
 
 /* --- core0 shadow of the YM2612 timers/status (gwsnd_shadow.c) ------ */
 void gwsnd_shadow_reset(void);
