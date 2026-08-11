@@ -1,6 +1,6 @@
 # Pico-genesisPlus
 
-A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display. Works best with [Adafruit Fruitjam](https://www.adafruit.com/product/6200)
+A Sega Genesis/Mega Drive emulator for the Raspberry Pi Pico 2 (RP2350). Loads roms from SD-card, uses hdmi for display. 
 
 Create a FAT32 (recommended) or exFAT formatted SD card and copy your Genesis/Mega Drive roms and [optional metadata](#using-metadata) on to it. It is possible to organize your roms into different folders. Then insert the SD Card into the card slot. Needless to say you must own all the roms you put on the card.
 
@@ -12,11 +12,34 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis).
 
 Roms that are too big to load in flash or PSRAM are not listed. Files that are not Mega Drive roms are refused with a message, instead of starting the emulator on whatever the file happens to contain.
 
+## Supported configurations
+
+Everything runs on the RP2350 (Pico 2) with the arm core. RP2040 boards and RISC-V builds are not supported.
+
+Ready-made `.uf2` files for all of these are on the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest).
+
+| Board | Video output | Build command | Release binary |
+| ----- | ------------ | ------------- | -------------- |
+| Adafruit [Fruit Jam](https://www.adafruit.com/product/6200) — **recommended** | HSTX, 60 Hz | `./bld.sh -c8` | `picogenesisPlus_AdafruitFruitJam_arm_piousb.uf2` |
+| Pico 2 on breadboard or [custom PCB](PCB), with [Adafruit DVI breakout](https://www.adafruit.com/product/4984) + microSD breakout | HSTX, 60 Hz | `./bld.sh -c2 -2` | `picogenesisPlus_AdafruitDVISD_pico2_arm.uf2` |
+| Same, but with a Pico 2 W | HSTX, 60 Hz | `./bld.sh -c2 -2 -w` | `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2` |
+| Adafruit Metro RP2350 | HSTX, 60 Hz | `./bld.sh -c5` | `picogenesisPlus_AdafruitMetroRP2350_arm.uf2` |
+| Murmulator M2 | HSTX, 60 Hz | `./bld.sh -c13` | `picogenesisPlus_MurmulatorM2_arm.uf2` |
+| Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291) | PicoDVI, 77.1 Hz | `./bld.sh -c1 -2` | `picogenesisPlus_PimoroniDVI_pico2_arm.uf2` |
+| Waveshare RP2350-Zero with custom PCB | PicoDVI, 77.1 Hz | `./bld.sh -c6 -2` | `picogenesisPlus_WaveShareRP2350ZeroWithPCB_arm.uf2` |
+| Waveshare RP2350-USB-A | PicoDVI, 77.1 Hz | `./bld.sh -c9` | `picogenesisPlus_WaveShare2350USBA_arm_piousb.uf2` |
+| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) | PicoDVI, 77.1 Hz | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
+| Murmulator M1 | PicoDVI, 77.1 Hz | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
+
 > [!WARNING]
 > **Only HSTX boards (e.g. Adafruit Fruit Jam) deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
 > The high refresh rate on non-HSTX boards is related to the high overclocking of the RP2350.
 > This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
 > If you experience problems, try using a **different monitor or TV**.  
+
+PSRAM is detected at boot. When it is present the rom is loaded into PSRAM and games start immediately; without PSRAM the rom is first copied into flash, which takes several seconds (see [recently played games](#recently-played-games)). PSRAM is wired up on the Fruit Jam, Metro RP2350, Murmulator M1/M2, and on a Pimoroni Pico Plus 2 used with the `-c2` config.
+
+Other configurations of `bld.sh` exist for related projects but are not supported here: `-c3` and `-c4` are RP2040 boards, `-c7` (Waveshare RP2350-PiZero) is disabled because of [#7](https://github.com/fhoedemakers/pico-genesisPlus/issues/7), `-c11` is deprecated, and `-c14` (Adafruit Feather RP2350 with TLV320DAC3100) builds but has no release binary. Run `./bld.sh -h` for the full list of build options.
 
 ## SD card setup 
 
@@ -124,32 +147,16 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 
 Raspberry Pi Pico 2 arm-s is the only supported config.  Builds for Risc-v currently do not work.
 
-Building for breadboard and PCB configurations. 
+Clone the repository and run the build command for your board from the [supported configurations](#supported-configurations) table:
 
 ````bash
 git clone https://github.com/fhoedemakers/pico-genesisPlus.git
 cd pico-genesisPlus
 git submodule update --init
-./bld.sh -c2 -2
+./bld.sh -c8            # Adafruit Fruit Jam, see the table for other boards
 ````
 
-Building for the Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291)
-
-````bash
-git clone https://github.com/fhoedemakers/pico-genesisPlus.git
-cd pico-genesisPlus
-git submodule update --init
-./bld.sh -c1 -2
-````
-
-Building for the Adafruit [Fruit Jam](https://www.adafruit.com/product/6200)
-
-````bash
-git clone https://github.com/fhoedemakers/pico-genesisPlus.git
-cd pico-genesisPlus
-git submodule update --init
-./bld.sh -c8
-````
+The resulting `.uf2` is copied to the `releases` folder. `./bld.sh -h` lists all options, and `./buildAll.sh` builds every supported configuration in one go.
 
 ### Emulator core and PC test harness
 
