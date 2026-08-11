@@ -150,6 +150,7 @@ target_compile_definitions(${projectname} PUBLIC
     # FrensHelpers::setClocksAndStartStdio only honors this when PIO-USB is in use
     # (PLL_USB must stay at 48 MHz for native TinyUSB).
     GENESIS_OVERCLOCK_HSTX_FIX=1
+    PICO_FLASH_SIZE_BYTES=16777216  # Real size determined at runtime.
 )
 
 # The gwenesis core renders directly into the display framebuffer, so its
