@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <algorithm>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
@@ -294,6 +295,35 @@ static inline int mapWiipadButtons(uint16_t buttonData)
     return mapped;
 }
 
+/* Some pads have no third button at all: the vintage NES controller on the
+   GPIO port and the AliExpress Manta in NES mode. For those, SELECT doubles as
+   the Genesis C button while a game runs - the menu is unaffected, it reads the
+   pads through its own code and keeps SELECT for itself.
+
+   The SELECT bit is deliberately left in place, so every in-game SELECT+...
+   hotkey keeps working. C is only withheld while START is held down, so
+   SELECT+START opens the settings menu without pressing C on its way out. */
+static inline int selectActsAsC(int bits)
+{
+    return ((bits & SELECT) && !(bits & START)) ? (bits | C) : bits;
+}
+
+#if NES_PIN_CLK != -1
+/* One GPIO pad's buttons, with SELECT promoted to C.
+
+   Applied to every pad on the port, not just ones that identify as NES. The
+   NES/SNES check in the driver reads the shift register's unused outputs,
+   which an original NES pad grounds but aftermarket ones leave floating - they
+   are then taken for SNES pads and would silently lose C. Nothing is given up
+   by mapping unconditionally either: this port is read through the legacy
+   8-bit view (A, B, Select, Start, dpad), so a SNES pad here cannot reach C
+   any other way. */
+static inline int nesPadButtons(int pad)
+{
+    return selectActsAsC(nespad_states[pad]);
+}
+#endif
+
 /* Core callback: refresh button_state[] (active low, S A C B R L D U). */
 extern "C" void gwenesis_io_get_buttons()
 {
@@ -318,18 +348,26 @@ extern "C" void gwenesis_io_get_buttons()
                 (gp.buttons & io::GamePadState::Button::START ? START : 0) |
                 0;
 
+        // The Manta reports as a NES pad in its NES mode, and then has no
+        // button that can reach C. Applied per source, so a pad with a real C
+        // sharing the same player slot keeps its own SELECT.
+        if (gp.GamePadName && strcmp(gp.GamePadName, "Manta NES") == 0)
+        {
+            v = selectActsAsC(v);
+        }
+
 #if NES_PIN_CLK != -1
         // When USB controller is connected both NES ports act as controller 2
         if (usbConnected)
         {
             if (i == 1)
             {
-                v = v | nespad_states[1] | nespad_states[0];
+                v = v | nesPadButtons(1) | nesPadButtons(0);
             }
         }
         else
         {
-            v |= nespad_states[i];
+            v |= nesPadButtons(i);
         }
 #endif
 // When USB controller is connected  wiipad acts as controller 2

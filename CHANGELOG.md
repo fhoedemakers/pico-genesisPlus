@@ -65,11 +65,47 @@ including the games that had no sound effects at all before.
   game had been played.
 - Fixed *Xeno Crisis* showing a black screen when started as the second game after
   power-on.
+- Fixed memory corruption when loading a file with an odd number of bytes: the
+  byte-swap step wrote one byte past the end of the buffer. Real cartridge images
+  are always an even number of bytes, so this only happened with a file that was
+  not a rom.
 
 ## Performance
 
 - Full speed (60 fps) on HSTX boards such as the Adafruit Fruit Jam, including in
   games with heavy sound activity.
+
+## Controllers
+
+- **NES controllers can now press C.** Controllers on the NES/SNES GPIO port and the
+  AliExpress NES USB controller have no third button, which left the Genesis C
+  button out of reach. SELECT now doubles as C while a game runs. Every SELECT + ...
+  combination keeps working, and C is held back while START is down, so
+  SELECT + START still opens the settings menu. USB SNES controllers are unaffected —
+  they have a real X button — and nothing changes in the menu.
+- **The Genesis C button opens the recently played list in the menu.** C reports
+  itself differently from the X button other pads use, so it did not reach the rom
+  browser.
+
+## Menu
+
+- **Recently played games.** The menu now remembers the last 20 games you started,
+  most recent first. Open the list with Button3 in the rom browser, or with
+  **Recently played** in the settings menu (SELECT) — the settings route also works
+  on controllers without a third button, such as a NES pad on the GPIO port. Games
+  can be started from the list or removed from it with SELECT. The list is stored as
+  plain text in `/recent_MD.txt` on the SD card, so it can be edited or deleted from
+  a PC.
+- **Boards without PSRAM no longer copy the rom to flash when it is already there.**
+  Restarting the game you just played, or picking it again from the recently played
+  list where it is marked `[READY]`, now takes about a second instead of the several
+  seconds of blank screen the flash write used to cost. The emulator verifies the
+  image in flash before trusting it, and copies the rom again whenever anything
+  differs — including when the file on the card has changed since it was written.
+- **Files that are not Mega Drive roms are refused.** The rom list filters on file
+  name only, and both `.md` and `.bin` match plenty of files that are not games — a
+  markdown README shows up in the list. Picking one used to run the 68000 on random
+  data; it now reports the problem and returns to the menu.
 
 ## Known limitations
 

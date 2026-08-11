@@ -10,7 +10,7 @@ Games cannot save their progress: cartridge save memory is not emulated, so game
 
 Based on [Gwenesis](https://github.com/bzhxx/gwenesis).
 
-Roms that are too big to load in flash or PSRAM are not listed.
+Roms that are too big to load in flash or PSRAM are not listed. Files that are not Mega Drive roms are refused with a message, instead of starting the emulator on whatever the file happens to contain.
 
 > [!WARNING]
 > **Only HSTX boards (e.g. Adafruit Fruit Jam) deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
@@ -35,9 +35,9 @@ Roms that are too big to load in flash or PSRAM are not listed.
 
 - Dual Shock/Dual Sense and PSClassic. 
 - Xbox style controllers (XInput)
-- Vintage NES controller: **Note** No C-button
+- Vintage NES controller: **Note** No C-button of its own, so SELECT acts as C while a game runs (this goes for any controller on the NES/SNES GPIO port). SELECT + START still opens the settings menu.
 - ALiExpress SNES USB controller: **Note** To enable B-button you need to press Y on this controller every time you start a game or boot into the menu. 
-- AliExpress NES USB controller: **Note** No C-button
+- AliExpress NES USB controller: **Note** No C-button of its own, so SELECT acts as C while a game runs. SELECT + START still opens the settings menu.
 - Genesis Mini 1 C button is also SELECT. (Not ideal)
 - Genesis Mini 2 Mode button is SELECT
 - [Retro-Bit 8 button Arcade Pad with USB](https://www.retro-bit.com/controllers/genesis/#usb). Mode button is SELECT
@@ -52,6 +52,10 @@ Roms that are too big to load in flash or PSRAM are not listed.
 | Button3 | X (SNES only)  |    C    |   Y    |   Triangle       |
 | Select  | select | Mode (C on 3 button controller) | Select | Select     |
 
+Controllers without a third button get one while a game is running: SELECT doubles as Button3 (the Genesis C button). SELECT keeps all its other in-game jobs, and C is not sent while START is held, so SELECT + START still opens the settings menu.
+
+This applies to every controller on the NES/SNES GPIO port — those are read as 8 buttons (A, B, Select, Start and the d-pad), so a SNES pad plugged in there has no way to reach C either — and to the AliExpress NES USB controller. USB SNES controllers are unaffected: they have a real X button.
+
 ## Menu 
 Gamepad buttons:
 - UP/DOWN: Next/previous item in the menu.
@@ -59,6 +63,7 @@ Gamepad buttons:
 - Button2: Open folder/flash and start game.
 - Button1: Back to parent folder.
 - START: Show [metadata](#using-metadata) and box art (when available)
+- Button3: Show the list of [recently played games](#recently-played-games).
 - SELECT: Opens a setting menu. Here you can change settings like screen mode, scanlines, framerate display, menu colors and other board specific settings. Settings can also be changed in-game by pressing some button combinations as explained below. The settings menu can also be opened in-game.
 
 When using an USB-Keyboard:
@@ -66,13 +71,32 @@ When using an USB-Keyboard:
 - Z: Back to parent folder
 - X: Open Folder/flash and start a game
 - S: Show [metadata](#using-metadata) and box art (when available).
+- C: Show the list of [recently played games](#recently-played-games).
 - A: acts as the select button.
+
+## Recently played games
+
+The menu remembers the last 20 games you started, most recent first. Press Button3 in the rom browser to open the list, or pick **Recently played** in the settings menu (SELECT). The settings menu route also works on controllers without a third button, such as a NES pad on the GPIO port.
+
+In the list:
+- UP/DOWN: Move through the games.
+- Button2: Start the highlighted game.
+- SELECT: Remove it from the list.
+- START: Show [metadata](#using-metadata) and box art (when available).
+- Button1: Back to the rom browser.
+
+Starting a game from the rom browser adds it to the list, or moves it back to the top if it is already there. Picking a game that is no longer on the SD card reports it and offers SELECT to drop it. The list lives in `/recent_MD.txt` in the root of the card and is plain text, so it can be edited or deleted from a PC.
+
+The list is only available from the rom browser, not while a game is running.
+
+On boards without PSRAM, roms are copied into flash before they start. The game whose rom is already in flash is marked `[READY]`: starting it skips the copy and begins in about a second instead of the usual several. Any other game is copied to flash as before. This also applies to starting a game the normal way from the rom browser.
 
 ## Emulator (in game)
 Gamepad buttons:
 - SELECT + START, Xbox button: opens the settings menu. From there, you can:
   - Quit the game and return to the SD card menu
   - Adjust settings and resume your game.
+- **Controllers on the NES/SNES GPIO port, and the AliExpress NES USB controller**: SELECT on its own acts as the C button, since these have no third button available. All the SELECT + ... combinations below keep working, and holding START suppresses C so the settings menu can still be opened with SELECT + START.
 - SELECT + UP/SELECT + DOWN: switches screen modes.
 - SELECT + Button1/Button2: toggle rapid-fire.
 - START + Button2: Toggle framerate display
