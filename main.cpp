@@ -1037,6 +1037,64 @@ static size_t getSelectedRomSize(const char *path)
     return 4 * 1024 * 1024;
 }
 
+/* Reject anything that is not a plausible Mega Drive image before handing it
+   to the core. The menu only filters on extension (".md .bin") and both are
+   generic enough to match unrelated files, so without this a wrong pick sends
+   the 68000 off to execute junk from a garbage reset vector.
+
+   Reads go through the image as the loader left it: every 16-bit word is
+   byte-swapped for the core's little-endian fetches, so the byte at file
+   offset N lives at [N ^ 1]. */
+static bool isValidGenesisRom(uintptr_t addr, size_t size, char *err, size_t errSize)
+{
+    /* flashromtoPsram() returns nullptr on a read error or when the file does
+       not fit in PSRAM, and the menu has no way to report that back — catch it
+       here instead of letting the core fetch from address 0. */
+    if (addr == 0)
+    {
+        snprintf(err, errSize, "ROM could not be loaded");
+        return false;
+    }
+    /* Vector table (0x000..0x0FF) plus header (0x100..0x1FF): below that there
+       is nothing to run, and set_region() would read past the allocation. */
+    if (size < 0x200)
+    {
+        snprintf(err, errSize, "Not a Genesis ROM (too small)");
+        return false;
+    }
+    /* 68000 fetches are 16-bit and every cart image is word-sized. An odd size
+       also means the loader's byte-swap had a byte with no pair, so refuse
+       rather than run on a possibly damaged heap. */
+    if (size & 1)
+    {
+        snprintf(err, errSize, "Not a Genesis ROM (odd size)");
+        return false;
+    }
+
+    const unsigned char *rom = (const unsigned char *)addr;
+
+    /* Console name at 0x100: "SEGA MEGA DRIVE ", "SEGA GENESIS    ", ... */
+    if (rom[0x100 ^ 1] == 'S' && rom[0x101 ^ 1] == 'E' &&
+        rom[0x102 ^ 1] == 'G' && rom[0x103 ^ 1] == 'A')
+    {
+        return true;
+    }
+
+    /* Hacks and homebrew sometimes wipe the console name, so fall back on the
+       vector table: the initial PC (big-endian longword at 0x004) must be an
+       even address pointing at cartridge space past the header. */
+    uint32_t pc = ((uint32_t)rom[0x04 ^ 1] << 24) | ((uint32_t)rom[0x05 ^ 1] << 16) |
+                  ((uint32_t)rom[0x06 ^ 1] << 8) | (uint32_t)rom[0x07 ^ 1];
+    if ((pc & 1) == 0 && pc >= 0x200 && pc < size)
+    {
+        printf("No SEGA header, but reset vector 0x%06x is sane: accepting\n", (unsigned)pc);
+        return true;
+    }
+
+    snprintf(err, errSize, "Not a Genesis ROM");
+    return false;
+}
+
 /// @brief
 /// Start emulator.
 /// @return
@@ -1048,7 +1106,7 @@ int main()
     char selectedRom[FF_MAX_LFN];
     romName = selectedRom;
     ErrorMessage[0] = selectedRom[0] = 0;
-    // This emulator is alwaays overclocked > 252MHZ
+    // This emulator is always overclocked at 378 Mhz or higher
     Frens::setOverclockLimits(CPUFreqKHz,  CPUFreqKHz, VOLTAGE, VOLTAGE);
     Frens::setClocksAndStartStdio(CPUFreqKHz, VOLTAGE);
 
@@ -1095,6 +1153,12 @@ int main()
             abSwapped = 0; // don't swap A and B buttons
             reset = resetGame = false;
             next_frame_time = 0; // Reset next frame time for FPS limiter
+            if (!isValidGenesisRom(ROM_FILE_ADDR, romSize, ErrorMessage, ERRORMESSAGESIZE))
+            {
+                printf("%s: %s\n", ErrorMessage, selectedRom);
+                reset = true;
+                break;
+            }
             printf("Starting game (%d KB rom) rom@%p\n", (int)(romSize / 1024),
                    (void *)ROM_FILE_ADDR);
             if (!init_emulator_mem())
