@@ -1048,7 +1048,8 @@ int main()
     char selectedRom[FF_MAX_LFN];
     romName = selectedRom;
     ErrorMessage[0] = selectedRom[0] = 0;
-
+    // This emulator is alwaays overclocked > 252MHZ
+    Frens::setOverclockLimits(CPUFreqKHz,  CPUFreqKHz, VOLTAGE, VOLTAGE);
     Frens::setClocksAndStartStdio(CPUFreqKHz, VOLTAGE);
 
     printf("==========================================================================================\n");
