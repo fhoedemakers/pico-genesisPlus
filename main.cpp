@@ -140,7 +140,7 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     0,                               // Scanlines toggle (superseded by Screen Mode)
     HSTX,                            // Scanline Type (HSTX only)
     1,                               // FPS Overlay
-    0,                               // Audio Enable
+    1,                               // Audio Enable
     1,                               // Frame Skip
     HSTX && ENABLEDVI,               // Display Mode (HDMI or DVI, only when HSTX is enabled, because non-HSTX builds always use HDMI)
     (EXT_AUDIO_IS_ENABLED),          // External Audio
