@@ -10,7 +10,7 @@
 Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam](https://www.adafruit.com/product/6200)
 
 
-[See setup section in the readme of the pico-infonesPlus repo on how to install and wire up](https://github.com/fhoedemakers/pico-infonesPlus#pico-setup)
+[See the readme for how to install and wire up your board](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#getting-started)
 
 
 > [!WARNING]  
@@ -107,6 +107,24 @@ including the games that had no sound effects at all before.
   markdown README shows up in the list. Picking one used to run the 68000 on random
   data; it now reports the problem and returns to the menu.
 
+## Hardware
+
+- **The PicoNES PCB now takes a Pimoroni Pico Plus 2.** Design **v2.6**
+  (`pico_nesPCB_v2.6.zip`, attached to this release) added through-holes, so the
+  Pico can be mounted on male headers instead of soldered flat — which is what a
+  Pimoroni Pico Plus 2 needs, its SP/CE connector prevents it from lying against
+  the PCB.
+  That gets you 8 MB of PSRAM on the PCB: games start the moment you select them,
+  with none of the flash copying a plain Pico 2 has to do, and larger roms fit.
+  No separate binary is needed — `picogenesisPlus_AdafruitDVISD_pico2_arm.uf2`
+  reads the flash size and detects PSRAM at boot.
+- **The readme has a new Custom PCBs section** covering all three designs — the
+  PicoNES, the PicoNES Mini (Waveshare RP2350-Zero) and the PicoNES Micro
+  (Waveshare RP2350-USB-A) — with mounting, parts, which binary to flash and the
+  3D-printed cases. The old copy of the PCB files has been removed from the
+  repository; the current designs live in `pico_shared/PCB` and are attached to
+  every release.
+
 ## Known limitations
 
 - Games that use interlace mode are still not supported; for example the two-player
@@ -156,16 +174,21 @@ There are no risc-v binaries available.
 | Pimoroni Pico Plus 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
 
 
-### PCB Pico2
+### PicoNES PCB
+
+Designed by John Edgar Park. See the [Custom PCBs section of the readme](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#picones-pcb).
 
 | Board | Binary | Readme |
 |:--|:--|:--|
-| Pico 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2) |
-| Pico 2 W | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2) |
+| Pico 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
+| Pico 2 W | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
+| Pimoroni Pico Plus 2 (PCB v2.6 and male headers) | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
 
-PCB [pico_nesPCB_v2.1.zip](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/pico_nesPCB_v2.1.zip)
+PCB [pico_nesPCB_v2.6.zip](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/pico_nesPCB_v2.6.zip)
 
-3D-printed case designs for PCB:
+Design v2.6 has through-holes, so the Pico can be mounted on male headers. That is the only way to use a Pimoroni Pico Plus 2, which brings 8 MB of PSRAM: games then start immediately instead of after the flash copy.
+
+3D-printed case designs for PCB, by Gavin Knight ([DynaMight1124](https://github.com/DynaMight1124)):
 
 [https://www.thingiverse.com/thing:6689537](https://www.thingiverse.com/thing:6689537). 
 For the latest two player PCB 2.0, you need:
@@ -175,7 +198,12 @@ For the latest two player PCB 2.0, you need:
 - Power_Switch.stl.
 (*) in case you don't want to access the bootsel button on the Pico, you can choose Top_v2.0.stl
 
-### PCB WS2350-Zero (PCB required)
+> [!IMPORTANT]
+> If the Pico is mounted on male headers, download the **latest** top cover. Headers raise the Pico, and only the newest cover leaves room for the USB cable.
+
+### PicoNES Mini PCB (Waveshare RP2350-Zero, PCB required)
+
+Designed by Gavin Knight ([DynaMight1124](https://github.com/DynaMight1124)). See the [Custom PCBs section of the readme](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#picones-mini-pcb).
 
 | Board | Binary | Readme |
 |:--|:--|:--|
@@ -183,10 +211,13 @@ For the latest two player PCB 2.0, you need:
 
 PCB: [Gerber_PicoNES_Mini_PCB_v2.0.zip](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/Gerber_PicoNES_Mini_PCB_v2.0.zip)
 
-3D-printed case designs for PCB WS2350-Zero:
+3D-printed case design, also by Gavin Knight:
 [https://www.thingiverse.com/thing:7041536](https://www.thingiverse.com/thing:7041536)
 
-### PCB Waveshare RP2350-USBA with PCB
+### PicoNES Micro PCB (Waveshare RP2350-USB-A)
+
+Designed by Gavin Knight ([DynaMight1124](https://github.com/DynaMight1124)). See the [Custom PCBs section of the readme](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#picones-micro-pcb).
+
 [Binary](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_WaveShare2350USBA_arm_piousb.uf2)
 
 PCB: [Gerber_PicoNES_Micro_v1.2.zip](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/Gerber_PicoNES_Micro_v1.2.zip)
