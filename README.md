@@ -113,7 +113,7 @@ Design v2.6 added through-holes, so there are now two ways to fit the board:
 Two NES controllers give you a two-player setup; a USB controller for player 1 and a NES controller in either port for player 2 works just as well. Keep in mind that a NES controller has no C button — [SELECT stands in for it](#controllers-and-buttons) while a game runs.
 
 > [!NOTE]
-> You can also connect an SNES controller. The sockets speak the SNES protocol as well. The connectors differ, so a SNES pad needs a [SNES-to-NES adapter cable](https://nl.aliexpress.com/item/1005007923169070.html) — one per socket — [or one you make yourself](http://www.neshq.com/hardmods/snes_to_nes_controller.txt).
+> You can also connect an SNES controller. The sockets speak the SNES protocol as well. The connectors differ, so a SNES pad needs a [SNES-to-NES adapter cable you make yourself](https://github.com/fhoedemakers/pico-snesPlus/blob/main/snestonescontroller.md) — one per socket.
 
 <img width="480" alt="Two-player setup with NES controllers" src="https://github.com/user-attachments/assets/d40ed98f-4632-4161-986a-732d35290fac" />
 
