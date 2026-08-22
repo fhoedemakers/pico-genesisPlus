@@ -60,6 +60,20 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
   exact `m68k_cycles_master()` timestamps.
 - `NONE` enum renamed `NONE_` (collides with pico_shared `SaveStateTypes`).
 - `GW_SRAM_FUNC` on `m68k_read/write_memory_8/16/32`.
+- Cartridge save RAM, all of whose logic lives in `port/gwsram.c`; the core
+  only routes to it:
+  - `gwenesis_bus_map_address()`: the `range < 0x80` arm returns `SRAM_ADDR`
+    when `gwsram_hit(address)`, else `ROM_ADDR` as before. The test is one
+    subtract and one compare, and can never match on a cart without save
+    RAM, so ordinary ROM reads pay a failed compare.
+  - `gwenesis_bus_map_io_address()`: `$A13xxx` (the /TIME region, which
+    carries the save RAM control register at `$A130F1`) now returns
+    `TIME_CTRL`. Upstream's `address & 0x1000` test routed it to the Z80
+    control registers, where it matched neither BUSREQ nor RESET and did
+    nothing beyond a `z80_sync()`; reads got `z80_read_ctrl()`'s `0xFF`
+    default, which the `TIME_CTRL` read case returns unchanged.
+  - `SRAM_ADDR` / `TIME_CTRL` cases in `gwenesis_bus_read_memory_8/16` and
+    `gwenesis_bus_write_memory_8/16`.
 
 ### `bus/gwenesis_bus.h`
 - `GWENESIS_AUDIO_BUFFER_LENGTH_PAL` 1056 → **1072**: a PAL frame
@@ -75,9 +89,38 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
 - `cpu_memory_map memory_map[256]` (5 KB) compiled out of
   `m68ki_cpu_core` — every reader is inside `#if 0` in m68kcpu.h.
 
+### `cpus/M68K/m68kcpu.h`
+- `m68ki_read_8/16/32` short-circuit everything below `$800000` straight to
+  `FETCH*ROM`, so a 68000 data read never reaches `m68k_read_memory_*` and
+  therefore never reaches the bus mapper. Cartridge save RAM lives in that
+  window, so these three now test `gwsram_hit()` first and go to
+  `gwsram_read8/16` (the 32-bit one delegates to `m68k_read_memory_32`,
+  which maps each word separately and so handles a read straddling the
+  ROM/save-RAM boundary).
+
+  Without this the writes land — `m68ki_write_*` already routes everything
+  below `$FF0000` through `m68k_write_memory_*` — but every read-back
+  returns the ROM mirror, so a game stores its save and then cannot see it.
+  `hosttest`'s `GEN_SRAM_SELFTEST` reads through `m68ki_read_8` (via the
+  `gwenesis_host_cpu_read8` hook in m68kcpu.c) precisely because checking
+  only the bus entry point passes while every real game fails.
+
+  This is the one part of save RAM that can cost frames: it is inlined into
+  every opcode handler that reads memory. `gwsram_hit()` is wrapped in
+  `__builtin_expect(..., 0)` so the save-RAM path stays off the straight-line
+  fall-through, and the whole test compiles away under
+  `-DGENESIS_CART_SRAM=0` for an on-hardware A/B (see the README).
+
+  Still bypassed, deliberately: `m68k_read_immediate_*` and
+  `m68k_read_pcrelative_*`. Both are instruction-stream fetches, and PC
+  relative displacement is +/-32 KB, so neither can reach save RAM from
+  code running in ROM.
+
 ### `cpus/M68K/m68kcpu.c`
 - `GW_SRAM_FUNC` on `m68k_run` (dispatch loop only; the opcode handlers
   and the 320 KB `TABLES_FULL` const tables stay in flash).
+- Host-only `gwenesis_host_cpu_read8()` test hook exposing `m68ki_read_8`
+  (see the m68kcpu.h note above). Compiled out of the firmware.
 
 ### `cpus/Z80/Z80.c`
 - **Bug fix**: the `GENESIS` opcode-fetch path declared
@@ -181,10 +224,17 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
 
 - Interlace mode unimplemented (`gwenesis_vdp_render_line` returns —
   Sonic 2 two-player is blank).
-- No cartridge save-RAM / EEPROM / SSF2 mapper: `$200000-$3FFFFF` reads
-  ROM, writes are dropped (Sonic 3 / Phantasy Star IV can't save; >4 MB
-  ROMs unsupported). Adding it means one extra range case in
-  `gwenesis_bus_map_address` plus persistence.
+- No SSF2 mapper: the bank registers at `$A130F3-$A130FF` are ignored, so
+  ROMs larger than 4 MB are unsupported.
+- No serial EEPROM (Wonder Boy in Monster World, NBA Jam, Micro Machines
+  2, Mega Man: The Wily Wars). Those carts declare a two-byte range in the
+  same header field save RAM uses; `gwsram_detect()` recognises them and
+  leaves the window unmapped, so they behave as they did before save RAM
+  existed. Supporting them needs an I2C device model and a per-game table.
+- VDP DMA reads cartridge space through `FETCH16ROM()`
+  (`gwenesis_vdp_dma_m68k`), bypassing the bus, so a DMA sourced from save
+  RAM would transfer ROM. No known game does this — save RAM is byte-wide
+  and slow, which is exactly what DMA is not for.
 - VDP DMA is instantaneous; FIFO not emulated.
 - YM2612 busy flag (status bit 7) not emulated; stereo panning compiled
   out (mono mix).

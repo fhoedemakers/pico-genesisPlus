@@ -31,6 +31,7 @@ extern "C"
 #include "gwenesis_sn76489.h"
 #include "gwsnd.h"
 #include "buffers.h"
+#include "gwsram.h"
 }
 
 bool isFatalError = false;
@@ -168,6 +169,178 @@ const uint8_t g_available_screen_modes_md[] = {
     1  // NOSCANLINE_1_1
 };
 
+/* ------------------------------------------------------------------ */
+/* Cartridge save RAM persistence                                      */
+/*                                                                     */
+/* One file per game in /SAVES, named after the rom, as in             */
+/* pico-infonesPlus and pico-smsplus. The file is always 64 KB and     */
+/* laid out the way Genesis Plus GX and Kega write .srm — file offset  */
+/* = address & 0xFFFF, with 0xFF wherever the cart drives nothing — so */
+/* saves can be carried between this emulator and a PC one. The in-RAM */
+/* buffer is packed (see port/gwsram.h), so both directions interleave */
+/* through a small chunk buffer instead of a 64 KB temporary.          */
+/*                                                                     */
+/* Scratch is static rather than automatic: PICO_STACK_SIZE is 3 KB    */
+/* and saveCartSram() runs from ProcessAfterFrameIsRendered(), i.e.    */
+/* from inside the frame loop.                                         */
+/* ------------------------------------------------------------------ */
+#define SRM_FILE_SIZE 0x10000
+
+static FIL srmFile;
+static char srmPath[FF_MAX_LFN + 16];
+static uint8_t srmChunk[512];
+
+static void buildSrmPath()
+{
+    /* GetfileNameFromFullPath() returns a pointer into romName and
+       stripextensionfromfilename() edits in place, so strip the copy. */
+    snprintf(srmPath, sizeof(srmPath) - 5, GAMESAVEDIR "/%s",
+             Frens::GetfileNameFromFullPath(romName));
+    Frens::stripextensionfromfilename(srmPath + sizeof(GAMESAVEDIR));
+    strcat(srmPath, ".srm");
+}
+
+/* n bytes of 0xFF: the gaps in the file the cart does not back. */
+static FRESULT writeSrmFiller(uint32_t n)
+{
+    memset(srmChunk, 0xFF, sizeof(srmChunk));
+    while (n)
+    {
+        UINT want = n < sizeof(srmChunk) ? (UINT)n : (UINT)sizeof(srmChunk);
+        UINT put = 0;
+        FRESULT fr = f_write(&srmFile, srmChunk, want, &put);
+        if (fr != FR_OK)
+            return fr;
+        if (put != want)
+            return FR_DISK_ERR;
+        n -= want;
+    }
+    return FR_OK;
+}
+
+/* The mapped range, expanded from the packed buffer back to the flat layout. */
+static FRESULT writeSrmSpan()
+{
+    uint32_t produced = 0; /* bytes of the range emitted so far */
+
+    while (produced < gwsram_span)
+    {
+        uint32_t left = gwsram_span - produced;
+        UINT want = left < sizeof(srmChunk) ? (UINT)left : (UINT)sizeof(srmChunk);
+        UINT put = 0;
+        FRESULT fr;
+
+        gwsram_export(produced, srmChunk, want);
+        fr = f_write(&srmFile, srmChunk, want, &put);
+        if (fr != FR_OK)
+            return fr;
+        if (put != want)
+            return FR_DISK_ERR;
+        produced += want;
+    }
+    return FR_OK;
+}
+
+static void loadCartSram()
+{
+    if (!gwsram_data || !gwsram_span)
+    {
+        return;
+    }
+    buildSrmPath();
+
+    FRESULT fr = f_open(&srmFile, srmPath, FA_READ);
+    if (fr == FR_NO_FILE || fr == FR_NO_PATH)
+    {
+        /* Nothing saved yet: the buffer keeps the 0xFF an unwritten chip has. */
+        printf("No save file %s, cartridge RAM starts empty\n", srmPath);
+        gwsram_dirty = 0;
+        return;
+    }
+    if (fr != FR_OK)
+    {
+        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot open save file: %d", fr);
+        printf("%s (%s)\n", ErrorMessage, srmPath);
+        return;
+    }
+
+    printf("Loading cartridge RAM from %s\n", srmPath);
+    fr = f_lseek(&srmFile, (FSIZE_t)(gwsram_start & 0xFFFF));
+
+    uint32_t consumed = 0; /* bytes of the range read so far */
+    while (fr == FR_OK && consumed < gwsram_span)
+    {
+        uint32_t left = gwsram_span - consumed;
+        UINT want = left < sizeof(srmChunk) ? (UINT)left : (UINT)sizeof(srmChunk);
+        UINT got = 0;
+
+        fr = f_read(&srmFile, srmChunk, want, &got);
+        if (fr != FR_OK || got == 0)
+        {
+            break; /* short or truncated file: the rest stays 0xFF */
+        }
+        gwsram_import(consumed, srmChunk, got);
+        consumed += got;
+    }
+    if (fr != FR_OK)
+    {
+        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot read save file: %d", fr);
+        printf("%s (%s)\n", ErrorMessage, srmPath);
+    }
+    else
+    {
+        printf("Cartridge RAM restored (%u of %u bytes of the range)\n",
+               (unsigned)consumed, (unsigned)gwsram_span);
+    }
+    f_close(&srmFile);
+    gwsram_dirty = 0;
+}
+
+static void saveCartSram()
+{
+    if (!gwsram_data || !gwsram_span)
+    {
+        return;
+    }
+    if (!gwsram_dirty)
+    {
+        printf("Cartridge RAM not written by the game, nothing to save.\n");
+        return;
+    }
+    buildSrmPath();
+
+    FRESULT fr = f_open(&srmFile, srmPath, FA_CREATE_ALWAYS | FA_WRITE);
+    if (fr != FR_OK)
+    {
+        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot open save file: %d", fr);
+        printf("%s (%s)\n", ErrorMessage, srmPath);
+        return;
+    }
+
+    printf("Saving cartridge RAM to %s\n", srmPath);
+    uint32_t lead = gwsram_start & 0xFFFF;
+    fr = writeSrmFiller(lead);
+    if (fr == FR_OK)
+        fr = writeSrmSpan();
+    if (fr == FR_OK)
+        fr = writeSrmFiller(SRM_FILE_SIZE - lead - gwsram_span);
+
+    /* The close is what flushes the last sector, so it decides success just as
+       much as the writes do. */
+    FRESULT closed = f_close(&srmFile);
+    if (fr == FR_OK)
+        fr = closed;
+
+    if (fr != FR_OK)
+    {
+        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Error writing save: %d", fr);
+        printf("%s (%s)\n", ErrorMessage, srmPath);
+        return; /* leave it dirty so the next attempt tries again */
+    }
+    printf("done\n");
+    gwsram_dirty = 0;
+}
+
 int ProcessAfterFrameIsRendered()
 {
     Frens::pollHeadPhoneJack();
@@ -201,6 +374,9 @@ int ProcessAfterFrameIsRendered()
     {
         showSettings = false;
         FrensSettings::savesettings();
+        /* "Enter BOOTSEL" and "Return to loader" reboot from inside the menu
+           and never come back, so flush the cartridge RAM on the way in. */
+        saveCartSram();
         abSwapped = 1;
         int rval = showSettingsMenu(true);
         abSwapped = 0;
@@ -1199,6 +1375,9 @@ int main()
             }
             printf("Starting game (%d KB rom) rom@%p\n", (int)(romSize / 1024),
                    (void *)ROM_FILE_ADDR);
+            /* Must precede init_emulator_mem(), which allocates the buffer
+               this sizes. */
+            gwsram_detect((const unsigned char *)ROM_FILE_ADDR, romSize);
             if (!init_emulator_mem())
             {
                 snprintf(ErrorMessage, 40, "Out of memory starting game");
@@ -1209,10 +1388,14 @@ int main()
             load_cartridge((const unsigned char *)ROM_FILE_ADDR, romSize);
             power_on();
             reset_emulation();
+            loadCartSram();
             Frens::dumpHeapStats("game start"); /* peak usage, both heaps */
             startAudioSinks();                  /* must precede gwsnd_init */
             gwsnd_init(0 /* pal detected per frame */, HSTX);
             emulate();
+            /* Covers both leaving the game and resetting it: the loop below
+               re-enters and reloads the file. */
+            saveCartSram();
             gwsnd_shutdown();
             free_emulator_mem();
         } while (resetGame);

@@ -32,6 +32,25 @@ The emulator core has been rebuilt from scratch from the upstream
 Sound is the headline change: it should now be close to what the hardware does,
 including the games that had no sound effects at all before.
 
+## Saved games
+
+- **Games with a battery-backed cartridge memory can now save, to the SD card.**
+  *Sonic the Hedgehog 3*, *Sonic & Knuckles*, the *Phantasy Star* and *Shining
+  Force* games, *Story of Thor*, the NHL series and many others were previously
+  unable to keep any progress. Nothing to switch on; the emulator recognises the
+  cartridges that have save memory and gives them a file of their own.
+- The save is written when you quit the game, when you reset it, and when you open
+  the settings menu with SELECT + START — so leaving through **Enter bootsel mode**
+  or **Return to emulator selection menu**, which restart the board immediately,
+  keeps it too. Nothing is written while you play, so a board switched off mid-game
+  loses whatever was saved since the menu was last opened.
+- The files are in `/SAVES` on the card, named after the rom with a `.srm`
+  extension, in the same format Genesis Plus GX and Kega use — so a save can be
+  carried to a PC emulator and back.
+- Cartridges with a serial EEPROM rather than a RAM chip (*Wonder Boy in Monster
+  World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*) still cannot
+  save. They need a different chip emulated, which is not in this release.
+
 ## Sound
 
 - **Rewritten sound engine.** Audio is generated at the YM2612's own sample rate

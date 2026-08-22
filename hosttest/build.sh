@@ -25,7 +25,7 @@ CORE_SRCS="gwenesis/bus/gwenesis_bus.c gwenesis/cpus/M68K/m68kcpu.c \
  gwenesis/vdp/gwenesis_vdp_mem.c gwenesis/vdp/gwenesis_vdp_gfx.c"
 
 PORT_SRCS="port/buffers.c port/gwsnd_core0.c port/gwsnd_resample.c \
- port/gwsnd_shadow.c port/savestate_stubs.c"
+ port/gwsnd_shadow.c port/savestate_stubs.c port/gwsram.c"
 
 build_lutgen() {
     echo "== building hosttest/lutgen"

@@ -90,7 +90,11 @@ enum mapped_address
     Z80_CTRL,
     TMSS_CTRL,
     VDP_ADDR,
-    RAM_ADDR
+    RAM_ADDR,
+    /* Port additions (append only, so upstream values do not shift):
+       cartridge save RAM and the /TIME region that controls it. */
+    SRAM_ADDR,
+    TIME_CTRL
 };
 
 enum gwenesis_bus_pad_button

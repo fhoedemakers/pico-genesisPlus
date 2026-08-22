@@ -73,6 +73,7 @@ add_executable(${projectname}
     port/gwsnd_resample.c
     port/gwsnd_shadow.c
     port/savestate_stubs.c
+    port/gwsram.c
 )
 
 pico_set_program_name(${projectname} "${projectname}")
@@ -93,8 +94,22 @@ pico_enable_stdio_usb(${projectname} 0)
 #   * RP2040-E5 USB device enumeration fix
 #   * Silence harmless warnings from TinyUSB / pico-pio-usb sources
 # ---------------------------------------------------------------------------
+# Cartridge save RAM (battery-backed SRAM -> /SAVES/<rom>.srm). On by default.
+# Building with -DGENESIS_CART_SRAM=0 compiles the save-RAM test out of the
+# 68000 read paths and the bus mapper, so the emulator can be measured with and
+# without it on the same board and scene when attributing a frame-rate or
+# audio-underrun change. Saves do not work in such a build.
+if (NOT DEFINED GENESIS_CART_SRAM)
+    set(GENESIS_CART_SRAM 1 CACHE STRING "Emulate cartridge save RAM (1) or compile it out for perf A/B (0)")
+endif()
+message("Cartridge save RAM: ${GENESIS_CART_SRAM}")
+
 target_compile_definitions(${projectname} PRIVATE
     PICO_RP2040_USB_DEVICE_ENUMERATION_FIX=1
+)
+
+target_compile_definitions(${projectname} PUBLIC
+    GENESIS_CART_SRAM=${GENESIS_CART_SRAM}
 )
 
 target_compile_options(${projectname} PRIVATE

@@ -259,6 +259,18 @@ When using a USB keyboard:
 - X: Button2
 - C: Button3
 
+## Saved games
+
+Cartridges that carried a battery-backed memory chip — *Sonic the Hedgehog 3*, *Sonic & Knuckles*, the *Phantasy Star* and *Shining Force* games, *Story of Thor*, the NHL series and many more — can save, and the save is kept on the SD card. Nothing to switch on: a game that has save memory picks it up when it starts.
+
+The save is written back when you quit the game, when you reset it, and when you open the settings menu with SELECT + START. That last one is what makes it safe to leave through **Enter bootsel mode** or **Return to emulator selection menu**, which restart the board there and then. Nothing is written while you are playing, so switching the board off in the middle of a game loses whatever the game has saved since you last opened the menu — open the menu first if you have just saved and want to be sure.
+
+The files live in the `/SAVES` folder on the card, one per game, named after the rom with a `.srm` extension. They are 64 KB and use the same layout as Genesis Plus GX and Kega, so a save can be copied to a PC emulator and back.
+
+Two kinds of cartridge are not covered:
+- Games with a serial EEPROM instead of a RAM chip: *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*. They play, but cannot save.
+- Games that saved to something other than the cartridge, such as the Sega CD backup RAM.
+
 ## Box art and game info
 
 Download the metadata pack from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/GenesisPlusMetadata.zip) and extract its contents to the root of the SD card. It contains box art and game information for many games. Select a rom in the menu and press START to see it. The screensaver shows random box art.
@@ -267,7 +279,7 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 
 ## Known limitations
 
-- **No saved games.** Cartridge save memory is not emulated, so games such as *Sonic the Hedgehog 3* and *Phantasy Star IV* play fine but cannot store a save.
+- **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games).
 - **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example.
 - **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.
@@ -291,6 +303,24 @@ The resulting `.uf2` is copied to the `releases` folder. `./bld.sh -h` lists all
 
 The emulator core in `gwenesis/` is a copy of the upstream [Gwenesis](https://github.com/bzhxx/gwenesis) sources with a small set of port changes. Every one of those changes is documented in [gwenesis/PORTING.md](gwenesis/PORTING.md), so the core can be refreshed from upstream later without losing them. The Pico-specific glue (sound engine, memory management, frame loop) lives in `port/`.
 
+### Measuring the cost of cartridge save RAM
+
+The save-RAM check sits in the 68000 read path, which the opcode handlers expand
+thousands of times, so it is the one part of the feature that can affect frame
+rate. To measure it, build the same board twice and compare the same scene with
+SELECT + DOWN (`underruns` must stay 0, and `emu avg` must stay under the frame
+period — 16667 us for NTSC, 20000 for PAL):
+
+````bash
+./bld.sh -c8                                    # normal build
+cmake -S . -B build -DGENESIS_CART_SRAM=0       # flip the switch, keep everything else
+cmake --build build -j$(nproc)                  # build without save RAM
+````
+
+`GENESIS_CART_SRAM=0` removes the test from the read paths and the bus mapper
+entirely; saves do not work in such a build, so it is a measurement tool, not a
+configuration. Set it back to 1 (or re-run `./bld.sh`) afterwards.
+
 ### PC test harness
 
 `hosttest/` builds the same emulator core as a normal Linux program, which makes it possible to investigate emulation bugs without hardware. It renders frames to PPM files and writes the audio to WAV files, and runs under AddressSanitizer.
@@ -307,6 +337,12 @@ To reproduce bugs that only appear when a game is started after another one, run
 
 ````bash
 GEN_FIRST_ROM=roms/sonic.md ./hosttest/gen_host roms/other.md 400 200 hosttest/out
+````
+
+Cartridge save memory can be exercised too. `GEN_SRM` names a `.srm` file to load before the run and write after it, in the same format the firmware uses, and `GEN_SRAM_SELFTEST=1` writes a pattern through the 68000 bus and reads it back, which checks detection and mapping without having to drive a game's save screen:
+
+````bash
+GEN_SRAM_SELFTEST=1 GEN_SRM=/tmp/s3.srm ./hosttest/gen_host roms/sonic3.md 600 0 hosttest/out
 ````
 
 Test roms placed in `hosttest/roms/` are ignored by git.

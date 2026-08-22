@@ -455,3 +455,15 @@ void gwenesis_m68k_load_state() {
 /* ======================================================================== */
 /* ============================== END OF FILE ============================= */
 /* ======================================================================== */
+
+#if defined(GWENESIS_HOST) && GWENESIS_HOST != 0
+/* Test hook (host harness only). The CPU reaches memory through m68ki_read_*,
+   which has its own shortcut for the cartridge window and does NOT go via
+   m68k_read_memory_*. Save RAM has to be reachable through this path, not just
+   through the bus entry points, so hosttest checks the one a game actually
+   uses. */
+unsigned int gwenesis_host_cpu_read8(unsigned int address)
+{
+    return m68ki_read_8(address);
+}
+#endif

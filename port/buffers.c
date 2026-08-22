@@ -14,6 +14,7 @@ Also defines the frame-loop globals the core expects the host to own
 #include "gwenesis_vdp.h"
 #include "ym2612.h"
 #include "buffers.h"
+#include "gwsram.h"
 
 /* Core-visible memory (extern pointers declared in the vendored core). */
 unsigned char *M68K_RAM = NULL; /* 64 KB — 68000 work RAM */
@@ -140,6 +141,21 @@ bool init_emulator_mem(void)
     ym2612_luts_init_ram(ym_tl_ram, ym_sin_ram, ym_lfo_ram);
 #endif
 
+    /* Cartridge save RAM, only for the games that have it — gwsram_detect()
+       must already have run on this ROM. Guard-word tracked like the rest;
+       it is the 9th entry at most, so tracked[] still has room. */
+    if (gwsram_span) {
+        gwsram_data = alloc_or_report(gwsram_bytes, "cart SRAM");
+        if (!gwsram_data) {
+            free_emulator_mem();
+            return false;
+        }
+        /* An SRAM chip that has never been written reads back as 0xFF; games
+           check for their own magic and format it themselves. */
+        memset(gwsram_data, 0xFF, gwsram_bytes);
+        gwsram_live = gwsram_bankable ? 0 : gwsram_span;
+    }
+
     memset(M68K_RAM, 0, MAX_RAM_SIZE);
     memset(ZRAM, 0, MAX_Z80_RAM_SIZE);
     memset(VRAM, 0, VRAM_MAX_SIZE);
@@ -158,11 +174,16 @@ void free_emulator_mem(void)
     free(VRAM);
     free(gwenesis_ym2612_buffer);
     free(gwenesis_sn76489_buffer);
+    free(gwsram_data);
     M68K_RAM = NULL;
     ZRAM = NULL;
     VRAM = NULL;
     gwenesis_ym2612_buffer = NULL;
     gwenesis_sn76489_buffer = NULL;
+    /* Leave the detected geometry alone (gwsram_detect owns it), but the
+       mapping must go with the buffer or the bus would dereference NULL. */
+    gwsram_data = NULL;
+    gwsram_live = 0;
 #if defined(GWENESIS_LUTS_IN_RAM) && GWENESIS_LUTS_IN_RAM != 0
     free(ym_tl_ram);
     free(ym_sin_ram);

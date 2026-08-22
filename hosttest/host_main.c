@@ -25,6 +25,16 @@ Input injection (frame ranges, inclusive):
     GEN_PRESS_A="200:220"       hold A on pad 0
     GEN_PRESS_B / GEN_PRESS_C   likewise
 
+Cartridge save RAM:
+    GEN_SRM=<file>              load it before the run and write it after,
+                                in the same flat 64 KB .srm layout the
+                                firmware uses (main.cpp)
+    GEN_SRAM_SELFTEST=1         write a pattern through the 68000 bus and
+                                read it back through the CPU's own read
+                                path, so detection and mapping can be
+                                checked without driving a game's save menu.
+                                Runs before the frame loop.
+
 Convert PPMs: python3 hosttest/ppm2png.py <outdir>
 */
 #include <stdio.h>
@@ -43,6 +53,7 @@ Convert PPMs: python3 hosttest/ppm2png.py <outdir>
 
 #include "gwsnd.h"
 #include "buffers.h"
+#include "gwsram.h"
 #include "wav.h"
 
 #include "frame_loop.inc"
@@ -170,6 +181,116 @@ static const unsigned char *load_rom(const char *path, size_t *size_out)
     return rom;
 }
 
+/* --------------------------- save RAM ------------------------------ */
+
+/* The firmware's .srm layout: a flat 64 KB image of the $200000 page, file
+   offset = address & 0xFFFF, 0xFF wherever nothing is backed. The interleave
+   itself is gwsram_export/gwsram_import, the same code main.cpp streams
+   through its chunk buffer — only the file I/O differs (stdio here, FatFs
+   with a 3 KB stack there). */
+#define SRM_FILE_SIZE 0x10000
+
+static void srm_load(const char *path)
+{
+    uint8_t *flat;
+    FILE *f;
+
+    if (!gwsram_data || !gwsram_span)
+        return;
+    f = fopen(path, "rb");
+    if (!f) {
+        printf("srm: %s not present, cartridge RAM starts empty\n", path);
+        return;
+    }
+    flat = malloc(SRM_FILE_SIZE);
+    memset(flat, 0xFF, SRM_FILE_SIZE);
+    if (fread(flat, 1, SRM_FILE_SIZE, f) == 0)
+        printf("srm: %s is empty\n", path);
+    fclose(f);
+
+    gwsram_import(0, flat + (gwsram_start & 0xFFFF), gwsram_span);
+    free(flat);
+    gwsram_dirty = 0;
+    printf("srm: loaded %s\n", path);
+}
+
+static void srm_save(const char *path)
+{
+    uint8_t *flat;
+    FILE *f;
+
+    if (!gwsram_data || !gwsram_span || !gwsram_dirty) {
+        printf("srm: nothing to save (dirty=%d)\n", gwsram_dirty);
+        return;
+    }
+    flat = malloc(SRM_FILE_SIZE);
+    memset(flat, 0xFF, SRM_FILE_SIZE);
+    gwsram_export(0, flat + (gwsram_start & 0xFFFF), gwsram_span);
+
+    f = fopen(path, "wb");
+    if (!f) {
+        fprintf(stderr, "srm: cannot write %s\n", path);
+        free(flat);
+        return;
+    }
+    fwrite(flat, 1, SRM_FILE_SIZE, f);
+    fclose(f);
+    free(flat);
+    gwsram_dirty = 0;
+    printf("srm: wrote %s (%d bytes)\n", path, SRM_FILE_SIZE);
+}
+
+/* Drive save RAM through the 68000 bus the way a game would, and report
+   whether it reads back. Returns non-zero on mismatch. */
+unsigned int gwenesis_host_cpu_read8(unsigned int address);
+
+static int srm_selftest(void)
+{
+    unsigned int addr, got;
+    uint32_t i;
+    int bad = 0;
+
+    if (!gwsram_span) {
+        printf("selftest: this cart has no save RAM\n");
+        return 0;
+    }
+    /* A bankable cart hides save RAM behind $A130F1 until the game asks. */
+    if (gwsram_bankable)
+        m68k_write_memory_8(0xA130F1, 1);
+
+    for (i = 0; i < 8 && i * 2 < gwsram_span; i++) {
+        addr = gwsram_start + i * 2 + (gwsram_packed ? (unsigned)gwsram_odd : 1u);
+        m68k_write_memory_8(addr, 0x5A ^ i);
+        /* Read back the way the 68000 does. m68k_read_memory_8() is the bus
+           entry point, but the CPU takes a shortcut for the cartridge window,
+           so checking only the bus would pass even with save RAM unreachable
+           to every game. */
+        got = gwenesis_host_cpu_read8(addr);
+        if (got != (0x5Au ^ i)) {
+            printf("selftest: %06x wrote %02x, CPU read %02x MISMATCH\n", addr,
+                   0x5Au ^ i, got);
+            bad++;
+        }
+        if (m68k_read_memory_8(addr) != got) {
+            printf("selftest: %06x bus and CPU read paths disagree\n", addr);
+            bad++;
+        }
+    }
+    /* The half the chip does not drive must read back as open bus. */
+    if (gwsram_packed) {
+        addr = gwsram_start + (gwsram_odd ? 0u : 1u);
+        m68k_write_memory_8(addr, 0x12);
+        got = gwenesis_host_cpu_read8(addr);
+        if (got != 0xFF) {
+            printf("selftest: unbacked half at %06x read %02x, expected ff\n",
+                   addr, got);
+            bad++;
+        }
+    }
+    printf("selftest: %s (dirty=%d)\n", bad ? "FAILED" : "ok", gwsram_dirty);
+    return bad;
+}
+
 /* ------------------------------ main ------------------------------- */
 
 int main(int argc, char **argv)
@@ -200,6 +321,7 @@ int main(int argc, char **argv)
         if (!first)
             return 1;
         printf("=== warm-up launch: %s ===\n", first_rom);
+        gwsram_detect(first, first_size);
         if (!init_emulator_mem()) {
             fprintf(stderr, "out of memory\n");
             return 1;
@@ -228,6 +350,7 @@ int main(int argc, char **argv)
     if (!rom)
         return 1;
 
+    gwsram_detect(rom, rom_size);
     if (!init_emulator_mem()) {
         fprintf(stderr, "out of memory\n");
         return 1;
@@ -244,6 +367,12 @@ int main(int argc, char **argv)
     load_cartridge(rom, rom_size);
     power_on();
     reset_emulation();
+
+    const char *srm_path = getenv("GEN_SRM");
+    if (srm_path && *srm_path)
+        srm_load(srm_path);
+    if (getenv("GEN_SRAM_SELFTEST"))
+        srm_selftest();
 
     gwsnd_set_output(audio_out);
     gwsnd_set_frame_tap(frame_tap);
@@ -266,6 +395,8 @@ int main(int argc, char **argv)
     wav_close(&wav_mixed);
     wav_close(&wav_ym);
     wav_close(&wav_psg);
+    if (srm_path && *srm_path)
+        srm_save(srm_path);
     gwsnd_shutdown();
     free_emulator_mem();
 

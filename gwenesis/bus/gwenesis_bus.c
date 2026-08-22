@@ -32,6 +32,7 @@ __license__ = "GPLv3"
 #include "gwenesis_sn76489.h"
 #include "gwenesis_savestate.h"
 #include "gwenesis_port.h"
+#include "gwsram.h"
 
 #if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
   #pragma GCC optimize("Ofast")
@@ -377,6 +378,14 @@ static inline unsigned int gwenesis_bus_map_z80_address(unsigned int address) {
  ******************************************************************************/
 static inline unsigned int gwenesis_bus_map_io_address(unsigned int address)
 {
+  /* /TIME region $A13000-$A130FF, which carries the save RAM control register
+     at $A130F1. Upstream's "address & 0x1000" test sent $A13xxx to the Z80
+     control registers, where it matched neither BUSREQ nor RESET and did
+     nothing but a z80_sync(); reads returned z80_read_ctrl()'s 0xFF default,
+     which the TIME_CTRL read case reproduces. */
+  if ((address & 0xF000) == 0x3000)
+    return TIME_CTRL;
+
   unsigned int range = (address & 0x1000) ;
   switch (range) {
   case 0:      return IO_CTRL;
@@ -404,7 +413,9 @@ unsigned int gwenesis_bus_map_address(unsigned int address) {
 
   // Check mask and select memory type
   if (range < 0x80) //        ROM ADDRESS 0x000000 - 0x3FFFFF
-    return ROM_ADDR;
+    /* Cartridge save RAM overlays part of this window on the carts that have
+       it; gwsram_hit() is one compare when they do not (port/gwsram.h). */
+    return gwsram_hit(address) ? SRAM_ADDR : ROM_ADDR;
 
   else if (range == 0xA0) // Z80 ADDRESS 0xA00000 - 0xA0FFFF
     return gwenesis_bus_map_z80_address(address);
@@ -438,6 +449,12 @@ static inline unsigned int gwenesis_bus_read_memory_8(unsigned int address) {
 
   case ROM_ADDR:
     return FETCH8ROM(address);
+
+  case SRAM_ADDR:
+    return gwsram_read8(address);
+
+  case TIME_CTRL:
+    return 0xFF;
 
   case RAM_ADDR:
     return FETCH8RAM(address);
@@ -488,6 +505,9 @@ static inline unsigned int gwenesis_bus_read_memory_16(unsigned int address) {
 
   case ROM_ADDR:
     return FETCH16ROM(address);
+
+  case SRAM_ADDR:
+    return gwsram_read16(address);
 
   case IO_CTRL:
     return gwenesis_io_read_ctrl(address & 0x1F);
@@ -540,6 +560,14 @@ static inline void gwenesis_bus_write_memory_8(unsigned int address,
 
   case RAM_ADDR:
     WRITE8RAM(address, value);
+    return;
+
+  case SRAM_ADDR:
+    gwsram_write8(address, value);
+    return;
+
+  case TIME_CTRL:
+    gwsram_time_write(address, value);
     return;
 
   case IO_CTRL:
@@ -600,6 +628,15 @@ static inline void gwenesis_bus_write_memory_16(unsigned int address,
 
   case RAM_ADDR:
     WRITE16RAM(address, value);
+    return;
+
+  case SRAM_ADDR:
+    gwsram_write16(address, value);
+    return;
+
+  case TIME_CTRL:
+    /* Byte register on an odd address; a word write puts it in the low half. */
+    gwsram_time_write(address | 1, value & 0xFF);
     return;
 
   case Z80_RAM_ADDR:
