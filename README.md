@@ -421,6 +421,43 @@ Test roms placed in `hosttest/roms/` are ignored by git.
 
 ## Credits
 
-- [Gwenesis](https://github.com/bzhxx/gwenesis) by **bzhxx** — the Genesis/Mega Drive emulator core this project is built on.
+### Emulator core
+
+- [Gwenesis](https://github.com/bzhxx/gwenesis) by **bzhxx** — the Genesis/Mega Drive emulator core this project is built on. `gwenesis/` is a vendored copy of upstream commit `168e466`; every port change is written up in [gwenesis/PORTING.md](gwenesis/PORTING.md).
+
+Gwenesis is itself built out of other people's work:
+
+- **Musashi**, the 68000 emulator, by **Karl Stenerud**, with the modifications **Eke-Eke** made for Genesis Plus GX.
+- The **Z80** emulator by **Marat Fayzullin**.
+- **YM2612** FM synthesis from MAME by **Jarek Burczynski** and **Tatsuyuki Satoh**, with additional code and fixes by **Eke-Eke** for Genesis Plus GX.
+- The **SN76489** PSG by **Maxim**, with the SMS Plus modifications by **Charles MacDonald**.
+
+### Drivers and libraries
+
+- HSTX HDMI/DVI output with audio: [pico_hdmi](https://github.com/fliperama86/pico_hdmi) by [fliperama86](https://github.com/fliperama86), who also helped getting it working here.
+- DVI output and utility code: [pico_lib](https://github.com/shuichitakano/pico_lib) by [Shuichi Takano](https://github.com/shuichitakano), whose work much of `pico_shared` — the USB HID and gamepad handling in particular — also comes from. The TMDS encoder in libdvi descends from [PicoDVI](https://github.com/Wren6991/PicoDVI) by **Luke Wren**.
+- XInput controllers: [tusb_XInput](https://github.com/Ryzee119/tusb_XInput) by [Ryzee119](https://github.com/Ryzee119).
+- SD card: [pico_fatfs](https://github.com/elehobica/pico_fatfs) by [elehobica](https://github.com/elehobica), on top of [FatFs](http://elm-chan.org/fsw/ff/) by **ChaN**.
+- PSRAM: [PicoPlusPsram](https://github.com/AndrewCapon/PicoPlusPsram) by [AndrewCapon](https://github.com/AndrewCapon), with [lwmem](https://github.com/MaJerle/lwmem) by [Tilen Majerle](https://github.com/MaJerle) as its allocator.
+- I2S audio: [pico-extras](https://github.com/raspberrypi/pico-extras) by Raspberry Pi (Trading) Ltd.
+- The TLV320DAC3100 codec register script used on the Fruit Jam is adapted from [jepler/fruitjam-doom](https://github.com/jepler/fruitjam-doom).
+
+### Hardware
+
 - The **PicoNES PCB** was designed by **John Edgar Park** ([@johnedgarpark](https://twitter.com/johnedgarpark)).
 - The **PicoNES Mini** and **PicoNES Micro** PCBs, and the 3D-printed cases for all of them, were designed by **Gavin Knight** ([DynaMight1124](https://github.com/DynaMight1124)).
+
+### AI assistance
+
+[Anthropic Claude Opus 4.7 and Opus 5](https://www.anthropic.com/claude/opus) assisted with:
+
+- rebuilding the emulator core from clean upstream Gwenesis sources, and writing up every port change in `gwenesis/PORTING.md`
+- the new sound engine: the catch-up timestamps, the resampling, and moving sound generation onto the second core
+- cartridge save RAM — `.srm` files on the SD card, claimed on first use with a fallback to PSRAM
+- running PAL games at 50 Hz
+- the edge-triggered Z80 reset that lets SGDK games boot with sound
+- fixing heap corruption and leftover state when one game is started after another
+- refusing files that are not Mega Drive roms
+- the `hosttest/` PC test harness
+- linking the emulator into a pinned slot for [pico-bootLoader](https://github.com/fhoedemakers/pico-bootLoader)
+- general bug fixes, and rewrites of this readme and the changelog
