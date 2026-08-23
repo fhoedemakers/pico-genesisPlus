@@ -1,6 +1,6 @@
 # CHANGELOG
 
-> Rebuilt emulator core with a new sound engine: FM music, PSG noise, DAC samples (the "SEGAAA!" voice) and SGDK game audio all work now. 256-wide games fill the screen, and starting games one after another is stable.
+> Rebuilt emulator core with a new sound engine: audio quality is greatly enhanced, and FM music, PSG noise, DAC samples (the "SEGAAA!" voice) and SGDK game audio all work now. Performance on HSTX boards is greatly improved. 256-wide games fill the screen, and starting games one after another is stable.
 
 # General Info
 
