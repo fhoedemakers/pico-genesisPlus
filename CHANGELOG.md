@@ -24,6 +24,8 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 > If you experience problems, try using a **different monitor or TV**.  
 >  
 > **Note:** This limitation does **not** apply to **HSTX-based boards** (e.g., *Adafruit Fruit Jam*), where the monitor refresh rate can be set to **60 Hz**.
+>
+> Games also **run slower** on PicoDVI boards. See [Performance](#performance) below.
 
 # v0.14 Release notes
 
@@ -101,10 +103,22 @@ including the games that had no sound effects at all before.
   are always an even number of bytes, so this only happened with a file that was
   not a rom.
 
+<a name="performance"></a>
 ## Performance
 
 - Full speed (60 fps) on HSTX boards such as the Adafruit Fruit Jam, including in
   games with heavy sound activity.
+- **Games run slower on boards without HSTX**, which use the PicoDVI driver for the
+  picture. Making that picture takes so much of the board's attention that the
+  emulator does not get enough left over, so the action, the music and the sound all
+  drag a little -- how much depends on the game. Everything else works normally, and
+  the games are still playable. The boards this applies to:
+  Pimoroni Pico DV Demo Base (`-c1`), Waveshare RP2350-Zero / PicoNES Mini (`-c6`),
+  Waveshare RP2350-USB-A / PicoNES Micro (`-c9`), Spotpear HDMI board (`-c10`) and
+  Murmulator M1 (`-c12`). This is not something that can be tuned away: the board is
+  already clocked as high as it will go. For full speed use an HSTX board -- the
+  Fruit Jam, a Pico 2 or Pimoroni Pico Plus 2 with an Adafruit DVI breakout (also on
+  the PicoNES PCB), the Metro RP2350 or the Murmulator M2.
 
 ## Controllers
 
@@ -164,6 +178,8 @@ including the games that had no sound effects at all before.
   titles such as *Sonic 3* and *Phantasy Star IV* play but cannot store a save.
 - Non-HSTX (PicoDVI) boards still run the display at 77.1 Hz, see
   [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
+- Games do not run at full speed on non-HSTX (PicoDVI) boards, see
+  [Performance](#performance).
 
 ## For developers
 

@@ -34,17 +34,43 @@ Ready-made `.uf2` files for all of these are on the [releases page](https://gith
 | Same, but with a Pico 2 W | HSTX, 60 Hz | `./bld.sh -c2 -2 -w` | `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2` |
 | Adafruit Metro RP2350 | HSTX, 60 Hz | `./bld.sh -c5` | `picogenesisPlus_AdafruitMetroRP2350_arm.uf2` |
 | Murmulator M2 | HSTX, 60 Hz | `./bld.sh -c13` | `picogenesisPlus_MurmulatorM2_arm.uf2` |
-| Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291) | PicoDVI, 77.1 Hz | `./bld.sh -c1 -2` | `picogenesisPlus_PimoroniDVI_pico2_arm.uf2` |
-| Waveshare RP2350-Zero on the [PicoNES Mini PCB](#picones-mini-pcb) | PicoDVI, 77.1 Hz | `./bld.sh -c6 -2` | `picogenesisPlus_WaveShareRP2350ZeroWithPCB_arm.uf2` |
-| Waveshare RP2350-USB-A, on its own or on the [PicoNES Micro PCB](#picones-micro-pcb) | PicoDVI, 77.1 Hz | `./bld.sh -c9` | `picogenesisPlus_WaveShare2350USBA_arm_piousb.uf2` |
-| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) | PicoDVI, 77.1 Hz | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
-| Murmulator M1 | PicoDVI, 77.1 Hz | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
+| Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c1 -2` | `picogenesisPlus_PimoroniDVI_pico2_arm.uf2` |
+| Waveshare RP2350-Zero on the [PicoNES Mini PCB](#picones-mini-pcb) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c6 -2` | `picogenesisPlus_WaveShareRP2350ZeroWithPCB_arm.uf2` |
+| Waveshare RP2350-USB-A, on its own or on the [PicoNES Micro PCB](#picones-micro-pcb) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c9` | `picogenesisPlus_WaveShare2350USBA_arm_piousb.uf2` |
+| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
+| Murmulator M1 | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
 
 > [!WARNING]
 > **Only HSTX boards deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
 > The high refresh rate on non-HSTX boards is related to the high overclocking of the RP2350.
 > This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
 > If you experience problems, try using a **different monitor or TV**.  
+> **Games also run slower on these boards**, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
+
+### Speed on PicoDVI boards
+
+Boards without HSTX use the PicoDVI driver to put the picture on screen, and making
+that picture takes so much of the board's attention that the emulator does not get
+enough left over. Games run slower than they should: the action, the music and the
+sound all drag a little, and how noticeable it is depends on the game. Everything
+else works the same as on any other board.
+
+These are the boards it applies to:
+
+| Board | Build command |
+| ----- | ------------- |
+| Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291) | `./bld.sh -c1 -2` |
+| Waveshare RP2350-Zero on the [PicoNES Mini PCB](#picones-mini-pcb) | `./bld.sh -c6 -2` |
+| Waveshare RP2350-USB-A, on its own or on the [PicoNES Micro PCB](#picones-micro-pcb) | `./bld.sh -c9` |
+| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) | `./bld.sh -c10 -2` |
+| Murmulator M1 | `./bld.sh -c12 -2` |
+
+For games at full speed you want one of the HSTX boards from the table above: the
+Adafruit Fruit Jam, a Pico 2 or Pimoroni Pico Plus 2 with an Adafruit DVI breakout
+(also on the PicoNES PCB), the Adafruit Metro RP2350 or the Murmulator M2.
+
+This is not something that can be tuned away. The board is already clocked as high
+as it will go, so there is nothing left to hand to the emulator.
 
 ### PSRAM
 
@@ -285,6 +311,7 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 - **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console -- there is no setting to force 50 Hz.
 - **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example.
 - **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
+- **Games run slower on PicoDVI boards.** Boards without HSTX cannot keep up with full speed, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.
 
 ## For developers
