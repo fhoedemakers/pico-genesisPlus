@@ -262,11 +262,24 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
 ## Verification
 
 `hosttest/` runs this exact core on Linux under AddressSanitizer, dumps
-PPM frames and per-chip WAVs, regenerates and diffs the LUT headers
-(`build.sh check`), and `GEN_VERIFY_SHADOW=1` runs the core0 timer shadow
-(`port/gwsnd_shadow.c`) in lockstep with the real chip — proven bit-exact
-over ~950,000 status reads across Sonic 1/3, Xeno Crisis, Streets of Rage
-2, Gunstar Heroes, Thunder Force IV and Columns.
+PPM frames and per-chip WAVs, and regenerates and diffs the LUT headers
+(`build.sh check`).
+
+`GEN_VERIFY_SHADOW=1` runs the core0 timer shadow (`port/gwsnd_shadow.c`)
+in lockstep with the real chip, comparing every status read and aborting
+on the first divergence. 3000 frames each of Thunder Force IV, Streets of
+Rage 2, Gunstar Heroes, Sonic 1, Columns, Xeno Crisis and Sonic 3:
+1,916,100 status reads, no divergence.
+
+Read that total for what it is. It is not a property of the code but of
+the run length, and it is dominated by one game: Thunder Force IV alone
+polls 1,464,241 times (76%), Streets of Rage 2 and Gunstar Heroes about
+200,000 each, and the rest are noise — Xeno Crisis manages 142 and Sonic 3
+never reads the status register at all, so it verifies nothing here.
+A game that does not poll cannot corroborate the shadow no matter how long
+it runs. To confirm the check is not vacuous, suppress the shadow's timer-A
+overflow bit (`sh.status |= 0x01` in `gwsnd_shadow_run`) and rerun Thunder
+Force IV: it aborts after 460 reads with `shadow=00 chip=01`.
 
 `GEN_FIRST_ROM=<rom> gen_host <rom2> …` runs one game, tears it down in
 the firmware's exact order, then launches a second — the condition that

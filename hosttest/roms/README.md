@@ -4,16 +4,22 @@ Everything in this directory except this README is gitignored — drop the
 test ROM set here. The harness takes any `.md`/`.bin`/`.gen` path, but the
 regression matrix assumes:
 
-| File (suggested name)  | Exercises |
-|---|---|
-| `sonic1.md`            | SEGA voice (YM2612 DAC PCM), FM music |
-| `sonic3.md`            | DAC drums |
-| `sor2.md`              | FM + shadow/highlight |
-| `gunstar.md`           | shadow/highlight + heavy DMA |
-| `columns.md`           | H32 (256-wide) mode |
-| `xeno_crisis.md`       | SGDK / XGM driver (issue #11 repro) |
-| `tf4.md`               | Thunder Force IV — worst-case load |
-| any EUR ROM            | PAL timing (313 lines, 50 Hz) |
+| File (suggested name)  | Game | Exercises |
+|---|---|---|
+| `sonic1.md`            | Sonic the Hedgehog | DAC drums |
+| `sonic3.md`            | Sonic the Hedgehog 3 | SEGA voice (YM2612 DAC PCM), FM music, cartridge save RAM |
+| `sor2.md`              | Streets of Rage 2 / Bare Knuckle 2 | FM + shadow/highlight |
+| `gunstar.md`           | Gunstar Heroes | shadow/highlight + heavy DMA |
+| `columns.md`           | Columns | H32 (256-wide) mode |
+| `xeno_crisis.md`       | Xeno Crisis | SGDK / XGM driver (issue #11 repro) |
+| `tf4.md`               | Thunder Force IV / Lightening Force | worst-case load; by far the heaviest YM2612 status poller |
+| any EUR ROM            | — | PAL timing (313 lines, 50 Hz) |
+
+Check a ROM before trusting its filename: the game name is at file offset
+`$120` and the save-RAM declaration at `$1B0` (`RA` when the cart has save
+memory — of the two Sonic ROMs only Sonic 3 does). The two used to be the
+wrong way round, which silently pointed the `GEN_SRM` save-RAM example at a
+game with no save memory.
 
 Example run:
 
