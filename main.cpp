@@ -530,16 +530,49 @@ static inline int selectActsAsC(int bits)
 #if NES_PIN_CLK != -1
 /* One GPIO pad's buttons, with SELECT promoted to C.
 
-   Applied to every pad on the port, not just ones that identify as NES. The
-   NES/SNES check in the driver reads the shift register's unused outputs,
-   which an original NES pad grounds but aftermarket ones leave floating - they
-   are then taken for SNES pads and would silently lose C. Nothing is given up
-   by mapping unconditionally either: this port is read through the legacy
-   8-bit view (A, B, Select, Start, dpad), so a SNES pad here cannot reach C
-   any other way. */
+   Read through the full 12-button word, so both pad types reach the Genesis
+   buttons their labels promise, matching what the USB pads already do in
+   hid_app.cpp: the leftmost/bottom button is Genesis A and the one to the
+   right of it is Genesis B, i.e. NES B -> A, NES A -> B and SNES B -> A,
+   SNES A -> B, with SNES X on C. The pad shifts its buttons out in the order
+   bit0=B 1=Y 2=Select 3=Start 4=Up 5=Down 6=Left 7=Right 8=A 9=X 10=L 11=R on
+   a SNES pad, and bit0=A 1=B then the same Select/Start/dpad on a NES one.
+   Bits 2-7 therefore mean the same thing on both and already sit on the
+   constants above, so they pass straight through as a mask. SNES Y, L and R
+   have nowhere to go - the core is a 3-button pad.
+
+   Bits 0 and 1 are the two that swap meaning, so they need to know which pad
+   is on the wire. Only a NES pad can say so: it grounds the shift register's
+   unused outputs, which the driver sees as the ID nibble on every single read,
+   so NESPAD_TYPE_NES is not a guess and needs no button press first. Anything
+   else is taken for a SNES pad, which is what an idle SNES pad and an active
+   8-bit-only adapter cable both need - the cost is that an aftermarket NES pad
+   that leaves those outputs floating cannot be recognised and loses B.
+
+   SELECT still doubles as C for every pad on the port, SNES ones included -
+   see selectActsAsC() above. */
 static inline int nesPadButtons(int pad)
 {
-    return selectActsAsC(nespad_states[pad]);
+    const uint16_t ext = nespad_states_ext[pad];
+    int v = ext & (SELECT | START | UP | DOWN | LEFT | RIGHT); // same bits on both pads
+    if (nespad_padtype[pad] == NESPAD_TYPE_NES)
+    {
+        if (ext & (1u << 0))
+            v |= B; // NES A
+        if (ext & (1u << 1))
+            v |= A; // NES B
+    }
+    else
+    {
+        if (ext & (1u << 0))
+            v |= A; // SNES B
+        if (ext & (1u << 8))
+            v |= B; // SNES A
+        if (ext & (1u << 9))
+            v |= C; // SNES X
+        // bit1 is SNES Y - no fourth button to put it on.
+    }
+    return selectActsAsC(v);
 }
 #endif
 

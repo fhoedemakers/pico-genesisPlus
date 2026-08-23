@@ -124,6 +124,15 @@ their progress, and European (PAL) games run at the speed they were made for.
   combination keeps working, and C is held back while START is down, so
   SELECT + START still opens the settings menu. USB SNES controllers are unaffected —
   they have a real X button — and nothing changes in the menu.
+- **Controllers on the NES/SNES GPIO port now use the same buttons as everywhere else.**
+  A SNES pad there was read as if it were a NES pad, so only the first eight buttons it
+  sends were used: B worked as the Genesis A button, but Y ended up as B and the pad's
+  own A and X did nothing at all. NES pads had their two buttons the other way round
+  from every USB controller. The port now works out which pad is plugged in and both
+  follow the button table in the readme: **on a NES pad B is Genesis A and A is Genesis
+  B; on a SNES pad B is Genesis A, A is Genesis B and X is Genesis C.** SNES Y, L and R
+  are not used — the Genesis pad has three buttons. SELECT still doubles as C on both,
+  and nothing changes in the menu.
 - **The C button on a Genesis controller now opens the recently played list in the
   menu.**
 
@@ -191,6 +200,15 @@ their progress, and European (PAL) games run at the speed they were made for.
   [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - Games do not run at full speed on non-HSTX (PicoDVI) boards, see
   [Performance](#performance).
+- A NES pad clone on the NES/SNES GPIO port can lose its B button. The port now tells
+  the two pad types apart by the shift register outputs a NES pad does not use, which an
+  original Nintendo pad grounds — as do most aftermarket pads. One that leaves them
+  floating is taken for a SNES pad, where that button is Y and the Genesis has nowhere
+  to put it. Its A button and SELECT still work, and the pad behaves normally in the
+  menu, so only the in-game B button is affected. To check a pad, open
+  **Settings > Controller Test**, press a button and read the `Sent by pad:` line: a top
+  digit of `F` means the pad identifies itself properly.
+  ([#28](https://github.com/fhoedemakers/pico-genesisPlus/issues/28))
 
 ## For developers
 

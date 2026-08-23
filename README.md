@@ -243,7 +243,13 @@ The three Genesis buttons are called Button1, Button2 and Button3 throughout thi
 
 Some controllers have no button that can reach the Genesis C button. For those, **SELECT doubles as C while a game runs**. SELECT keeps all its other jobs, and C is not sent while START is held, so SELECT + START still opens the settings menu.
 
-This applies to every controller on the NES/SNES GPIO port — those are read as 8 buttons (A, B, Select, Start and the d-pad), so even a SNES pad plugged in there cannot reach C any other way — and to the AliExpress NES USB controller. USB SNES controllers are unaffected: they have a real X button.
+This applies to the vintage NES controller on the NES/SNES GPIO port, which has only two buttons (A and B, plus Select, Start and the d-pad), and to the AliExpress NES USB controller. SNES controllers are unaffected either way: they have a real X button, on the GPIO port as well as over USB.
+
+### NES and SNES pads on the GPIO port
+
+The two sockets speak one protocol but the pads send their buttons in a different order, so the port works out for itself which one is plugged in. A NES pad says so on every read, and anything else is taken for a SNES pad — including a SNES pad behind a home-made adapter cable, which works fully from the first button press with no need to wake it up first. Both then get the mapping from the table above: on a NES pad B is Genesis A and A is Genesis B, and on a SNES pad B is Genesis A, A is Genesis B and X is Genesis C. SNES Y, L and R are not used, because the Genesis pad only has three buttons.
+
+One caveat: a NES pad is recognised by grounding the shift register outputs it does not use, which is what an original Nintendo pad does, and most aftermarket ones with it. A clone that leaves them floating cannot be told from a SNES pad, and its B button will do nothing. Its A button and SELECT still work, so it stays usable. To check a pad, open **Settings > Controller Test**, press a button and look at the `Sent by pad:` line — a top digit of `F` means the pad identifies itself properly. ([#28](https://github.com/fhoedemakers/pico-genesisPlus/issues/28))
 
 ## Menu
 
@@ -348,6 +354,7 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 - **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - **Games run slower on PicoDVI boards.** Boards without HSTX cannot keep up with full speed, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.
+- **A NES pad clone on the GPIO port may lose its B button.** The port tells NES and SNES pads apart by the shift register outputs a NES pad does not use, which an original Nintendo pad grounds. A clone that leaves them floating is taken for a SNES pad, and on a SNES pad that button is Y, which the Genesis has nowhere to put. Its A button and SELECT still work, and the pad works normally in the menu — only in-game B is dead. See [NES and SNES pads on the GPIO port](#nes-and-snes-pads-on-the-gpio-port). ([#28](https://github.com/fhoedemakers/pico-genesisPlus/issues/28))
 
 ## For developers
 
