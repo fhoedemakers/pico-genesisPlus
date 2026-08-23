@@ -1,6 +1,6 @@
 # CHANGELOG
 
-> Rebuilt emulator core with a new sound engine: audio quality is greatly enhanced, and FM music, PSG noise, DAC samples (the "SEGAAA!" voice) and SGDK game audio all work now. Performance on HSTX boards is greatly improved. 256-wide games fill the screen, and starting games one after another is stable.
+> Games now run at full speed on HSTX boards, and the rebuilt emulator core brings greatly improved sound: music, noise effects, the "SEGAAA!" voice and the audio of SGDK games all work now, without dropouts in busy scenes. On top of that, games can save their progress, European (PAL) games run at the right speed, 256-wide games fill the screen, and starting one game after another is stable.
 
 # General Info
 
@@ -29,10 +29,43 @@ Only RP2350 (pico 2 based boards) supported. Works best with [Adafruit Fruit Jam
 
 # v0.14 Release notes
 
-The emulator core has been rebuilt from scratch from the upstream
-[Gwenesis](https://github.com/bzhxx/gwenesis) sources, with a new sound engine.
-Sound is the headline change: it should now be close to what the hardware does,
-including the games that had no sound effects at all before.
+Games now run at full speed on HSTX boards, in busy scenes as well. The emulator
+core has been rebuilt from the upstream
+[Gwenesis](https://github.com/bzhxx/gwenesis) sources with a new sound engine, so
+sound should be close to what the real console does — including the games that had
+no sound effects at all before. Two more big changes on top of that: games can save
+their progress, and European (PAL) games run at the speed they were made for.
+
+<a name="performance"></a>
+## Performance
+
+- Full speed on HSTX boards, including in games with heavy sound activity: a
+  Raspberry Pi Pico 2 or Pimoroni Pico Plus 2 on the PicoNES PCB or on a breadboard,
+  the Adafruit Fruit Jam, the Adafruit Metro RP2350 and the Murmulator M2.
+- **Games run slower on boards without HSTX** — the Pimoroni Pico DV Demo Base
+  (`-c1`), Waveshare RP2350-Zero / PicoNES Mini (`-c6`), Waveshare RP2350-USB-A /
+  PicoNES Micro (`-c9`), Spotpear HDMI board (`-c10`) and Murmulator M1 (`-c12`).
+  Putting the picture on screen takes so much of the board's attention that the
+  emulator does not get enough left over, so the action, the music and the sound all
+  drag a little. The games are still playable, and this is not something that can be
+  tuned away. See
+  [Speed on PicoDVI boards](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#speed-on-picodvi-boards)
+  in the readme for the full story and the list of boards that do run at full speed.
+
+## Sound
+
+- **New sound engine.** Music and sound effects are much closer to what the real
+  console produces.
+- **The "SEGAAA!" voice and other digitized sounds now play correctly.**
+- **Drums, explosions, waves and other noise effects are back.** That part of the
+  sound chip was completely silent before, so those effects were missing from every
+  game.
+- **Games developed with [SGDK](https://github.com/Stephane-D/SGDK), such as
+  *Xeno Crisis*, now have their sound effects and music.** This closes
+  [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11).
+- Sound no longer drops out in busy scenes.
+- On HSTX boards the sound is produced on the second processor core, which leaves
+  more room for the game itself.
 
 ## Saved games
 
@@ -49,76 +82,39 @@ including the games that had no sound effects at all before.
 - The files are in `/SAVES` on the card, named after the rom with a `.srm`
   extension, in the same format Genesis Plus GX and Kega use — so a save can be
   carried to a PC emulator and back.
-- Memory for a game's save is only claimed once the game actually uses it, so the
-  many homebrew games that declare a save memory they never touch cost nothing.
-  Games that declare a large one — common with SGDK — use PSRAM when the board has
-  it; on a board without PSRAM they play normally but cannot save.
+- A few games — mostly homebrew ones — ask for far more save memory than they ever
+  use. On a board with PSRAM they save normally; without PSRAM they play fine but
+  cannot save, and say so on the serial console.
 - Cartridges with a serial EEPROM rather than a RAM chip (*Wonder Boy in Monster
   World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*) still cannot
   save. They need a different chip emulated, which is not in this release.
 
 ## PAL games
 
-- **Games for European (PAL) consoles now run at 50 Hz.** The region was read from
-  the rom header but never reached the frame timing, so PAL games ran at 60 Hz --
-  too fast, with the music and sound pitched up to match. A rom marked as Europe
+- **Games for European (PAL) consoles now run at 50 Hz.** They used to run at 60 Hz
+  — too fast, with the music and sound pitched up to match. A rom marked as Europe
   now runs at the correct speed. Roms marked for more than one region (`JUE`) keep
   running at 60 Hz, as they would on an American console.
-
-## Sound
-
-- **Rewritten sound engine.** Audio is generated at the YM2612's own sample rate
-  (~53 kHz) with cycle-accurate register timing and resampled to 44.1 kHz, instead
-  of the low-rate, end-of-frame approach used before. FM music, PSG and DAC samples
-  are all affected.
-- **The "SEGAAA!" voice and other DAC samples now play correctly.**
-- **The PSG noise channel works again.** It was completely silent before, so drums,
-  explosions, waves and similar effects were missing from every game.
-- **Games developed with [SGDK](https://github.com/Stephane-D/SGDK), such as
-  *Xeno Crisis*, now have their sound effects and music.** This closes
-  [#11](https://github.com/fhoedemakers/pico-genesisPlus/issues/11).
-- Audio no longer drops out in busy scenes: samples are paced to the HDMI/I2S
-  output continuously through the frame rather than in one burst per frame.
-- On HSTX boards the entire sound synthesis runs on the second processor core,
-  next to the video output, leaving the first core free for the emulation itself.
+- PAL games leave more time for each frame, so **Frame Skip** in the settings menu
+  can usually be switched off for them, which gives a smoother picture.
 
 ## Video
 
-- **256-pixel-wide (H32) games now fill the screen.** Games such as *Columns* were
+- **256-pixel-wide games now fill the screen.** Games such as *Columns* were
   previously shown with black borders on the left and right; they are now scaled to
   the full width, as on real hardware.
-- Fixed picture corruption in games that switch between 224 and 240 line modes
-  while a frame is being drawn.
+- Fixed a corrupted picture in games that change the screen height while the picture
+  is being drawn.
 
 ## Stability
 
-- Fixed hard faults and out-of-memory errors when leaving a game and starting
-  another one. Games can now be started and exited repeatedly.
+- Fixed crashes and out-of-memory errors when leaving a game and starting another
+  one. Games can now be started and exited as often as you like.
 - Fixed *Space Invaders '91* showing a corrupted screen when started after another
   game had been played.
 - Fixed *Xeno Crisis* showing a black screen when started as the second game after
   power-on.
-- Fixed memory corruption when loading a file with an odd number of bytes: the
-  byte-swap step wrote one byte past the end of the buffer. Real cartridge images
-  are always an even number of bytes, so this only happened with a file that was
-  not a rom.
-
-<a name="performance"></a>
-## Performance
-
-- Full speed (60 fps) on HSTX boards such as the Adafruit Fruit Jam, including in
-  games with heavy sound activity.
-- **Games run slower on boards without HSTX**, which use the PicoDVI driver for the
-  picture. Making that picture takes so much of the board's attention that the
-  emulator does not get enough left over, so the action, the music and the sound all
-  drag a little -- how much depends on the game. Everything else works normally, and
-  the games are still playable. The boards this applies to:
-  Pimoroni Pico DV Demo Base (`-c1`), Waveshare RP2350-Zero / PicoNES Mini (`-c6`),
-  Waveshare RP2350-USB-A / PicoNES Micro (`-c9`), Spotpear HDMI board (`-c10`) and
-  Murmulator M1 (`-c12`). This is not something that can be tuned away: the board is
-  already clocked as high as it will go. For full speed use an HSTX board -- the
-  Fruit Jam, a Pico 2 or Pimoroni Pico Plus 2 with an Adafruit DVI breakout (also on
-  the PicoNES PCB), the Metro RP2350 or the Murmulator M2.
+- Fixed a crash when opening a file that is not a rom.
 
 ## Controllers
 
@@ -128,9 +124,8 @@ including the games that had no sound effects at all before.
   combination keeps working, and C is held back while START is down, so
   SELECT + START still opens the settings menu. USB SNES controllers are unaffected —
   they have a real X button — and nothing changes in the menu.
-- **The Genesis C button opens the recently played list in the menu.** C reports
-  itself differently from the X button other pads use, so it did not reach the rom
-  browser.
+- **The C button on a Genesis controller now opens the recently played list in the
+  menu.**
 
 ## Menu
 
@@ -144,13 +139,15 @@ including the games that had no sound effects at all before.
 - **Boards without PSRAM no longer copy the rom to flash when it is already there.**
   Restarting the game you just played, or picking it again from the recently played
   list where it is marked `[READY]`, now takes about a second instead of the several
-  seconds of blank screen the flash write used to cost. The emulator verifies the
-  image in flash before trusting it, and copies the rom again whenever anything
-  differs — including when the file on the card has changed since it was written.
-- **Files that are not Mega Drive roms are refused.** The rom list filters on file
-  name only, and both `.md` and `.bin` match plenty of files that are not games — a
-  markdown README shows up in the list. Picking one used to run the 68000 on random
-  data; it now reports the problem and returns to the menu.
+  seconds of blank screen the flash write used to cost. The rom already in flash is
+  reused only when it really is the same file.
+- **Files that are not Mega Drive roms are refused.** The rom list goes by file name
+  only, and both `.md` and `.bin` match plenty of files that are not games — a
+  markdown README shows up in the list. Picking one used to crash the emulator; it
+  now says what is wrong and returns to the menu.
+- **Game audio and Frame Skip can be switched on and off again** in the settings
+  menu. Frame Skip draws two out of every three frames to keep games running at
+  speed, and is on by default.
 
 ## Hardware
 
@@ -163,19 +160,33 @@ including the games that had no sound effects at all before.
   with none of the flash copying a plain Pico 2 has to do, and larger roms fit.
   No separate binary is needed — `picogenesisPlus_AdafruitDVISD_pico2_arm.uf2`
   reads the flash size and detects PSRAM at boot.
-- **The readme has a new Custom PCBs section** covering all three designs — the
-  PicoNES, the PicoNES Mini (Waveshare RP2350-Zero) and the PicoNES Micro
-  (Waveshare RP2350-USB-A) — with mounting, parts, which binary to flash and the
-  3D-printed cases. The old copy of the PCB files has been removed from the
-  repository; the current designs live in `pico_shared/PCB` and are attached to
-  every release.
+- All three PCB designs — the PicoNES, the PicoNES Mini (Waveshare RP2350-Zero) and
+  the PicoNES Micro (Waveshare RP2350-USB-A) — are attached to this release, and the
+  readme has a new
+  [Custom PCBs](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/README.md#custom-pcbs)
+  section covering mounting, parts, which binary to flash and the 3D-printed cases.
 
 ## Known limitations
 
+- Cartridges with a serial EEPROM instead of a save memory chip still cannot save:
+  *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The
+  Wily Wars*. Ordinary battery-backed cartridges do save, see
+  [Saved games](#saved-games) above.
+  ([#20](https://github.com/fhoedemakers/pico-genesisPlus/issues/20))
+- Roms larger than 4 MB do not work: they need bank switching that is not emulated,
+  so a game such as *Super Street Fighter II* breaks once it reaches past the first
+  4 MB. On a board with PSRAM such a rom does fit in memory and will start.
+  ([#21](https://github.com/fhoedemakers/pico-genesisPlus/issues/21))
+- Sound is mono: both sound chips are mixed into one channel that goes to the left
+  and the right speaker alike, so the stereo effects in games such as *Sonic* and
+  *Streets of Rage* play in the middle.
+  ([#22](https://github.com/fhoedemakers/pico-genesisPlus/issues/22))
 - Games that use interlace mode are still not supported; for example the two-player
   levels of *Sonic the Hedgehog 2* show a blank screen.
-- Games cannot save their progress: cartridge save memory is not emulated, so
-  titles such as *Sonic 3* and *Phantasy Star IV* play but cannot store a save.
+  ([#23](https://github.com/fhoedemakers/pico-genesisPlus/issues/23))
+- The region comes from the rom itself. A Europe-only rom runs at 50 Hz, everything
+  else at 60 Hz; there is no setting to force one or the other.
+  ([#24](https://github.com/fhoedemakers/pico-genesisPlus/issues/24))
 - Non-HSTX (PicoDVI) boards still run the display at 77.1 Hz, see
   [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - Games do not run at full speed on non-HSTX (PicoDVI) boards, see
@@ -183,11 +194,10 @@ including the games that had no sound effects at all before.
 
 ## For developers
 
-- Every difference between this emulator's copy of the Gwenesis core and upstream is
-  documented in `gwenesis/PORTING.md`, so the core can be updated from upstream again.
-- A PC test harness has been added in `hosttest/`. It builds the same emulator core
-  for Linux and dumps video frames and per-chip audio to files, which makes it
-  possible to find and fix emulation bugs without hardware.
+- Every difference from the upstream Gwenesis core is documented in
+  `gwenesis/PORTING.md`, so the core can be updated from upstream again.
+- New PC test harness in `hosttest/`: the same emulator core built for Linux, which
+  makes it possible to find emulation bugs without hardware.
 
 # previous changes
 
@@ -196,8 +206,9 @@ See [HISTORY.md](https://github.com/fhoedemakers/pico-genesisPlus/blob/main/HIST
 <a name="downloads___"></a>
 ## Downloads by configuration
 
-Binaries for each configuration are listed below. Binaries for Pico(2) also work for Pico(2)-w. No blinking led however on the -w boards.
-There are no risc-v binaries available.
+Binaries for each configuration are listed below. Only RP2350 (Pico 2) boards are supported, and there are no risc-v binaries available.
+
+A separate Pico 2 W binary is available for the breadboard and PicoNES PCB configuration. For the other configurations, use the Pico 2 binary on a Pico 2 W as well — the only thing you lose is the blinking led.
 
 
 ### Standalone boards
@@ -217,7 +228,7 @@ There are no risc-v binaries available.
 | Board | Binary | Readme |
 |:--|:--|:--|
 | Pico 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
-| Pico 2 W | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
+| Pico 2 W (untested) | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
 | Pimoroni Pico Plus 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
 
 
@@ -228,7 +239,7 @@ Designed by John Edgar Park. See the [Custom PCBs section of the readme](https:/
 | Board | Binary | Readme |
 |:--|:--|:--|
 | Pico 2 | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
-| Pico 2 W | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
+| Pico 2 W (untested) | [picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
 | Pimoroni Pico Plus 2 (PCB v2.6 and male headers) | [picogenesisPlus_AdafruitDVISD_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_AdafruitDVISD_pico2_arm.uf2) | [Readme](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2) |
 
 PCB [pico_nesPCB_v2.6.zip](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/pico_nesPCB_v2.6.zip)
@@ -297,7 +308,7 @@ For more info about the Murmulator see this website: https://murmulator.ru/ and 
 
 | Board | Binary |
 |:--|:--|
-| Pico 2/Pico 2 w | [picogenesisPlus_MurmulatorM1_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_MurmulatorM1_pico2_arm.uf2) |
+| Murmulator M1 (with a Pico 2) | [picogenesisPlus_MurmulatorM1_pico2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_MurmulatorM1_pico2_arm.uf2) |
 
 ### Murmulator M2 (untested)
 
@@ -305,7 +316,7 @@ For more info about the Murmulator see this website: https://murmulator.ru/ and 
 
 | Board | Binary |
 |:--|:--|
-| Pico/Pico w | [picogenesisPlus_MurmulatorM2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_MurmulatorM2_arm.uf2) |
+| Murmulator M2 | [picogenesisPlus_MurmulatorM2_arm.uf2](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/picogenesisPlus_MurmulatorM2_arm.uf2) |
 
 ### Other downloads
 
