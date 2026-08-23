@@ -9,16 +9,17 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis) by bzhxx.
 1. **Flash the firmware.** Pick the `.uf2` for your board from the [supported boards](#supported-boards) table and download it from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest). Hold the BOOTSEL button while you connect the board to your computer, then copy the file to the drive that appears.
 2. **Prepare an SD card.** Format it as FAT32 (recommended) or exFAT and copy your roms onto it, for example into a `/roms/MD` folder. Subfolders are fine, the menu lets you browse them. Needless to say, you must own the games you put on the card.
 3. **Add box art (optional).** See [box art and game info](#box-art-and-game-info).
-4. **Insert the card, connect a controller and switch the board on.** Browse the card, pick a game and play. Settings are saved on the card automatically.
+4. **Insert the card, connect a controller and switch the board on.** Browse the card, pick a game and play. Settings are saved on the card automatically. On a board without PSRAM the screen stays blank for a while when a game starts, because the rom is written to flash first — see [PSRAM](#psram).
 
 Wiring depends on the board. The hardware is the same as for the NES emulator, so the setup instructions are in the pico-infonesPlus readme:
 
 | Board | Setup instructions |
 | ----- | ------------------ |
 | Adafruit Fruit Jam | [Fruit Jam](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#adafruit-fruit-jam) |
-| Pico 2 on a breadboard with Adafruit breakouts | [Adafruit hardware and breadboard](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard) |
+| Pico 2 on a breadboard with Adafruit breakouts, or on the PicoNES PCB | [Adafruit hardware and breadboard](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) |
 | Adafruit Metro RP2350 | [Metro RP2350](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#adafruit-metro-rp2350) |
 | Pimoroni Pico DV Demo Base | [Pimoroni Pico DV Demo Base](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-for-pimoroni-pico-dv-demo-base) |
+| Pimoroni Pico Plus 2, wired the same as the Pico 2 above | [Adafruit hardware and breadboard](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) (needs v2.6 with male headers) |
 | PicoNES, PicoNES Mini or PicoNES Micro PCB | [Custom PCBs](#custom-pcbs) |
 
 ## Supported boards
@@ -76,7 +77,17 @@ as it will go, so there is nothing left to hand to the emulator.
 
 PSRAM is worth having: the rom is loaded straight into it and the game starts the moment you pick it. Without PSRAM the rom is first written to flash, which takes several seconds (though [recently played games](#recently-played-games) can skip that).
 
-It is detected at boot, so no separate binary is needed. You have it on the Fruit Jam and the Metro RP2350, on a Murmulator with a PSRAM chip fitted, and on a [Pimoroni Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2?variant=42092668289107) in any build that takes a Pico-shaped board — the breadboard/PicoNES build (`-c2`), the Pimoroni Pico DV Demo Base (`-c1`) and the Spotpear board (`-c10`).
+**Without PSRAM, be patient after picking a game.** Writing the rom to flash takes a
+while — a few seconds for a small game, considerably longer for a big one — and the
+screen stays blank until it is done. The LED on the board flashes on and off the
+whole time it is working, so as long as it keeps blinking the rom is still being
+written and the board has not locked up. Leave it alone until the game appears; do
+not switch the board off or reset it. Boards with no onboard LED (and a Pico 2 W)
+cannot show this, so there the blank screen is all you get. Games in the
+[recently played](#recently-played-games) list marked `[READY]` skip the wait
+altogether.
+
+It is detected at boot, so no separate binary is needed. You have it on the Fruit Jam and the Metro RP2350, on a Murmulator with a PSRAM chip fitted, and on a [Pimoroni Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2?variant=42092668289107) in any build that takes a Pico-shaped board — the breadboard/[PicoNES PCB](#picones-pcb) build (`-c2`), the Pimoroni Pico DV Demo Base (`-c1`) and the Spotpear board (`-c10`).
 
 Roms that are too large for the memory the board has are left out of the list in the menu.
 
