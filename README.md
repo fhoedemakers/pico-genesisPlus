@@ -280,6 +280,7 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 ## Known limitations
 
 - **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games).
+- **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console -- there is no setting to force 50 Hz.
 - **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example.
 - **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.

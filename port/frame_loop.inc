@@ -9,7 +9,7 @@ z80inst.h, ym2612.h, gwenesis_sn76489.h) and port/gwsnd.h.
 The including translation unit must be C, or wrap this in extern "C".
 
 Contract:
-  - gwenesis_frame_get_config() refreshes screen geometry from the VDP regs;
+  - gwenesis_frame_get_config() refreshes screen geometry and frame rate;
     call it, place the output buffer (320-wide rows, first visible line at
     the pointer given), then run gwenesis_frame_run().
   - gwenesis_frame_run() executes all scanlines with per-line 68000/Z80
@@ -42,14 +42,21 @@ extern int system_clock;   /* port-owned (port/buffers.c) */
 static int gwenesis_frame_lines_per_frame = LINES_PER_FRAME_NTSC;
 static int gwenesis_frame_is_pal = 0;
 
-/* Refresh geometry from the VDP registers; returns nonzero when PAL. */
+/* Refresh geometry from the VDP registers; returns nonzero when PAL.
+
+   Frame rate and display height are two different things from two different
+   places. VDP status bit 0 is the console (set_region, from the cartridge
+   header) and decides 313 lines at 50 Hz vs 262 at 60. REG1_PAL is the VDP's
+   240-line bit, which only decides how many of those lines carry picture --
+   most PAL games leave it clear and display 224 lines at 50 Hz. Upstream drove
+   all three from REG1_PAL, so those games ran at NTSC timing. */
 static int gwenesis_frame_get_config(void)
 {
-    gwenesis_frame_is_pal = REG1_PAL ? 1 : 0;
+    gwenesis_frame_is_pal = (gwenesis_vdp_status & 1) ? 1 : 0;
     screen_height = REG1_PAL ? 240 : 224;
     screen_width = REG12_MODE_H40 ? 320 : 256;
     gwenesis_frame_lines_per_frame =
-        REG1_PAL ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
+        gwenesis_frame_is_pal ? LINES_PER_FRAME_PAL : LINES_PER_FRAME_NTSC;
     return gwenesis_frame_is_pal;
 }
 

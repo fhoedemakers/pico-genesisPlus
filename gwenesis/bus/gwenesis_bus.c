@@ -314,30 +314,32 @@ void set_region()
     if (country & 4){
       printf("Oversea-NTSC USA 60Hz\n");
       gwenesis_io_set_reg(0, 0x81);
-   //   gwenesis_vdp_status &= 0xFFFE;
-     // mode_pal = 0;
+      gwenesis_vdp_status &= ~1;
       return;
     }
     /* EUROPE 50Hz */
     if (country & 8){
       printf("Oversea-PAL Europe 50Hz\n");
       gwenesis_io_set_reg(0, 0xC1);
-    //  gwenesis_vdp_status |= 0x1;
-      //mode_pal = 1;
+      /* VDP status bit 0 (VERSION_PAL) is the console region. The VDP's
+         vcounter and vblank logic already reads it -- until now nothing ever
+         set it, so every PAL branch in there was dead code. $A10001 bit 6,
+         set above, is the other way a game can ask. Not to be confused with
+         the VDP's mode_pal, which despite the name is the 240-line display
+         bit (REG1_PAL) and stays driven by the game. */
+      gwenesis_vdp_status |= 1;
       return;
     }
     /* set Asia 60HZ */
     if (country & 1){
       printf("Domestic-NTSC Asia 60Hz\n");
       gwenesis_io_set_reg(0, 0x1);
-    //  gwenesis_vdp_status &= 0xFFFE;
-      //mode_pal = 0;
+      gwenesis_vdp_status &= ~1;
       return;
     }
       printf("Oversea-NTSC USA 60Hz no detection>> default mode\n");
       gwenesis_io_set_reg(0, 0x81);
-     // gwenesis_vdp_status &= 0xFFFE;
-     // mode_pal = 0;
+      gwenesis_vdp_status &= ~1;
 
 }
 /******************************************************************************

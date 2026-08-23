@@ -58,6 +58,12 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
   stale context crashed relaunches (fix carried over from the old port).
 - The 6 sound-chip call sites route through the `gwsnd_*` seam with their
   exact `m68k_cycles_master()` timestamps.
+- `set_region()` now publishes the console region as VDP status bit 0
+  (`VERSION_PAL`) instead of leaving it commented out. The VDP's own
+  vcounter and vblank logic already read that bit, so until now every PAL
+  branch in `gwenesis_vdp_mem.c` was unreachable. Note the VDP's `mode_pal`
+  is *not* the console region despite the name -- it is `REG1_PAL`, the
+  240-line display bit, and stays driven by the game.
 - `NONE` enum renamed `NONE_` (collides with pico_shared `SaveStateTypes`).
 - `GW_SRAM_FUNC` on `m68k_read/write_memory_8/16/32`.
 - Cartridge save RAM, all of whose logic lives in `port/gwsram.c`; the core
@@ -82,6 +88,12 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
 - `Z80_FREQ_DIVISOR` overridable via `GWENESIS_Z80_DIVISOR` (upstream 14 ≈
   7% fast Z80; 15 is hardware-exact MCLK/15 — affects XGM1 PCM pitch, keep
   14 for upstream parity until A/B-tested on hardware).
+
+### `vdp/gwenesis_vdp_mem.c` (region)
+- `gwenesis_vdp_reset()` preserves status bit 0 rather than clearing it:
+  `set_region()` runs from `load_cartridge()`, i.e. before
+  `reset_emulation()`, so a plain `= 0x3C00` would drop the region on every
+  game start.
 
 ### `cpus/M68K/m68k.h`
 - `GWENESIS_PICO` branch: `ROM_DATA` as const pointer + masked

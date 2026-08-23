@@ -51,6 +51,14 @@ including the games that had no sound effects at all before.
   World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*) still cannot
   save. They need a different chip emulated, which is not in this release.
 
+## PAL games
+
+- **Games for European (PAL) consoles now run at 50 Hz.** The region was read from
+  the rom header but never reached the frame timing, so PAL games ran at 60 Hz --
+  too fast, with the music and sound pitched up to match. A rom marked as Europe
+  now runs at the correct speed. Roms marked for more than one region (`JUE`) keep
+  running at 60 Hz, as they would on an American console.
+
 ## Sound
 
 - **Rewritten sound engine.** Audio is generated at the YM2612's own sample rate

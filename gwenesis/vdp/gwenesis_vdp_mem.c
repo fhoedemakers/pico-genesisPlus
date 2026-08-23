@@ -164,7 +164,9 @@ void gwenesis_vdp_reset() {
   code_reg = 0;
   hint_pending = 0;
   // _vcounter = 0;
-  gwenesis_vdp_status = 0x3C00;
+  /* set_region() runs from load_cartridge(), before reset_emulation(), so the
+     console-region bit has to survive the reset rather than be cleared. */
+  gwenesis_vdp_status = 0x3C00 | (gwenesis_vdp_status & 1);
   // //line_counter_interrupt = 0;
   hvcounter_latched = 0;
   hvcounter_latch = 0;
