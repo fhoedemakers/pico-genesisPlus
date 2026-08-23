@@ -134,36 +134,39 @@ static uint16_t wiipad_raw_cached = 0;
 static uint32_t CPUFreqKHz = EMULATOR_CLOCKFREQ_KHZ;
 
 // Visibility configuration for options menu
-// 1 = show option line, 0 = hide.
-// Order must match enum in menu_settings.h
+// 1 = show option line, 0 = hide, -1 = always hidden.
+// Designated initializers, like g_settings_descriptions in menu_settings.h: a
+// positional list silently leaves every option appended to the enum at zero,
+// which is how MOPT_RECENT_GAMES came to depend on menu.cpp forcing it visible.
 const int8_t g_settings_visibility_md[MOPT_COUNT] = {
-    0,                               // Exit Game, or back to menu. Always visible when in-game.
-    0,                               // Reset Game
-    BOOTLOADER_BUILD,                // Return to emuLoader picker (only when built for the loader)
-    0,                               // Save / Restore State
-    1,                               // Screen Mode
-    0,                               // Scanlines toggle (superseded by Screen Mode)
-    HSTX,                            // Scanline Type (HSTX only)
-    1,                               // FPS Overlay
-    1,                               // Audio Enable
-    1,                               // Frame Skip
-    HSTX && ENABLEDVI,               // Display Mode (HDMI or DVI, only when HSTX is enabled, because non-HSTX builds always use HDMI)
-    (EXT_AUDIO_IS_ENABLED),          // External Audio
-    1,                               // Font Color
-    1,                               // Font Back Color
-    ENABLE_VU_METER,                 // VU Meter
-    (HW_CONFIG == 8),                // Fruit Jam Volume Control
-    0,                               // DMG Palette
-    0,                               // Border Mode
-    0,                               // Rapid Fire on A
-    0,                               // Rapid Fire on B
-    0,                               // Auto Insert Disk A
-    0,                               // Auto Swap FDS
-    0,                               // FDS Disk Swap
-    0,                               // Overclock (CPU high clock toggle)
-    0,                               // YM Audio (SMS only)
-    1,                               // Enter bootsel mode
-    1,                               // Controller Test
+    [MOPT_EXIT_GAME]                 = 0,  // Always visible when in-game.
+    [MOPT_RESET_GAME]                = 0,  // Always visible when in-game.
+    [MOPT_REBOOT_TO_LOADER]          = BOOTLOADER_BUILD, // Only when built for the loader
+    [MOPT_SAVE_RESTORE_STATE]        = 0,  // Savestates are not implemented in this port
+    [MOPT_SCREENMODE]                = 1,
+    [MOPT_SCANLINES]                 = 0,  // Superseded by Screen Mode
+    [MOPT_SCANLINE_TYPE]             = HSTX,
+    [MOPT_FPS_OVERLAY]               = 1,
+    [MOPT_AUDIO_ENABLE]              = 1,
+    [MOPT_FRAMESKIP]                 = 1,
+    [MOPT_DISPLAY_MODE]              = HSTX && ENABLEDVI, // non-HSTX builds always use HDMI
+    [MOPT_EXTERNAL_AUDIO]            = (EXT_AUDIO_IS_ENABLED),
+    [MOPT_FONT_COLOR]                = 1,
+    [MOPT_FONT_BACK_COLOR]           = 1,
+    [MOPT_FRUITJAM_VUMETER]          = ENABLE_VU_METER,
+    [MOPT_FRUITJAM_VOLUME_CONTROL]   = (HW_CONFIG == 8),
+    [MOPT_DMG_PALETTE]               = 0,  // Game Boy only
+    [MOPT_BORDER_MODE]               = 0,  // NES only
+    [MOPT_RAPID_FIRE_ON_A]           = 0,
+    [MOPT_RAPID_FIRE_ON_B]           = 0,
+    [MOPT_AUTO_INSERT_FDS_DISK_A]    = 0,  // FDS (NES) only
+    [MOPT_AUTO_SWAP_FDS_DISK]        = 0,  // FDS (NES) only
+    [MOPT_FDS_DISK_SWAP]             = 0,  // FDS (NES) only
+    [MOPT_OVERCLOCK]                 = 0,  // Fixed clock, see setOverclockLimits() below
+    [MOPT_FM_AUDIO]                  = 0,  // SMS only
+    [MOPT_ENTER_BOOTSEL_MODE]        = 1,
+    [MOPT_CONTROLLER_TEST]           = 1,
+    [MOPT_RECENT_GAMES]              = 1,  // Rom browser only; menu.cpp gates in-game
 };
 const uint8_t g_available_screen_modes_md[] = {
     0, // SCANLINE_8_7,
