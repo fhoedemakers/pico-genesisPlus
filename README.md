@@ -7,7 +7,7 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis) by bzhxx.
 ## Getting started
 
 1. **Flash the firmware.** Pick the `.uf2` for your board from the [supported boards](#supported-boards) table and download it from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest). Hold the BOOTSEL button while you connect the board to your computer, then copy the file to the drive that appears.
-2. **Prepare an SD card.** Format it as FAT32 (recommended) or exFAT and copy your roms onto it, for example into a `/roms/MD` folder. Subfolders are fine, the menu lets you browse them. Needless to say, you must own the games you put on the card.
+2. **Prepare an SD card.** Format it as FAT32 (recommended) or exFAT and copy your roms into a `/roms/MD` folder — that is where the menu opens, and it falls back to the root of the card when the folder is not there. Subfolders are fine, the menu lets you browse them. Needless to say, you must own the games you put on the card.
 3. **Add box art (optional).** See [box art and game info](#box-art-and-game-info).
 4. **Insert the card, connect a controller and switch the board on.** Browse the card, pick a game and play. Settings are saved on the card automatically. On a board without PSRAM the screen stays blank for a while when a game starts, because the rom is written to flash first — see [PSRAM](#psram).
 
@@ -32,14 +32,16 @@ Ready-made `.uf2` files for all of these are on the [releases page](https://gith
 | ----- | ------------ | ------------- | -------------- |
 | Adafruit [Fruit Jam](https://www.adafruit.com/product/6200) — **recommended** | HSTX, 60 Hz | `./bld.sh -c8` | `picogenesisPlus_AdafruitFruitJam_arm_piousb.uf2` |
 | Pico 2 or Pimoroni Pico Plus 2 on a breadboard or on the [PicoNES PCB](#picones-pcb), with an [Adafruit DVI breakout](https://www.adafruit.com/product/4984) + microSD breakout | HSTX, 60 Hz | `./bld.sh -c2 -2` | `picogenesisPlus_AdafruitDVISD_pico2_arm.uf2` |
-| Same, but with a Pico 2 W | HSTX, 60 Hz | `./bld.sh -c2 -2 -w` | `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2` |
+| Same, but with a Pico 2 W — *untested* | HSTX, 60 Hz | `./bld.sh -c2 -2 -w` | `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2` |
 | Adafruit Metro RP2350 | HSTX, 60 Hz | `./bld.sh -c5` | `picogenesisPlus_AdafruitMetroRP2350_arm.uf2` |
-| Murmulator M2 | HSTX, 60 Hz | `./bld.sh -c13` | `picogenesisPlus_MurmulatorM2_arm.uf2` |
+| Murmulator M2 — *untested* | HSTX, 60 Hz | `./bld.sh -c13` | `picogenesisPlus_MurmulatorM2_arm.uf2` |
 | Pimoroni [Pico DV Demo Base](https://shop.pimoroni.com/products/pimoroni-pico-dv-demo-base?variant=39494203998291) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c1 -2` | `picogenesisPlus_PimoroniDVI_pico2_arm.uf2` |
 | Waveshare RP2350-Zero on the [PicoNES Mini PCB](#picones-mini-pcb) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c6 -2` | `picogenesisPlus_WaveShareRP2350ZeroWithPCB_arm.uf2` |
 | Waveshare RP2350-USB-A, on its own or on the [PicoNES Micro PCB](#picones-micro-pcb) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c9` | `picogenesisPlus_WaveShare2350USBA_arm_piousb.uf2` |
-| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
-| Murmulator M1 | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
+| [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) — *untested* | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
+| Murmulator M1 — *untested* | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
+
+Boards marked *untested* build and are released, but have not been tried on real hardware. They also have no setup section in the table above: wire the Spotpear board according to [its own documentation](https://spotpear.com/index/product/detail/id/1207.html), and for the Murmulator boards see [murmulator.ru](https://murmulator.ru/) and [#150](https://github.com/fhoedemakers/pico-infonesPlus/issues/150).
 
 > [!WARNING]
 > **Only HSTX boards deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
@@ -94,6 +96,12 @@ Roms that are too large for the memory the board has are left out of the list in
 ### Other build configurations
 
 `bld.sh` has a few more configurations that belong to related projects but are not supported here: `-c3` and `-c4` are RP2040 boards, `-c7` (Waveshare RP2350-PiZero) is disabled because of [#7](https://github.com/fhoedemakers/pico-genesisPlus/issues/7), `-c11` is deprecated, and `-c14` (Adafruit Feather RP2350 with TLV320DAC3100) builds but has no release binary. Run `./bld.sh -h` for the full list of options.
+
+### Several emulators on one board
+
+The binaries above are standalone: one board, one emulator. With [pico-bootLoader](https://github.com/fhoedemakers/pico-bootLoader) you can instead keep several emulators, and a *Doom* port, on the same board and pick one from an on-screen menu at power-on, without a computer. The bootloader and an SD card archive containing this emulator are on the [pico-bootLoader releases page](https://github.com/fhoedemakers/pico-bootLoader/releases).
+
+Started that way, the settings menu gains an extra item, **Return to emulator selection menu**, which takes you back to that boot menu. To build a bootloader version yourself, add `-b` to the build command, for example `./bld.sh -c8 -b`; the `.uf2` ends up in `releases_bl`.
 
 ## Custom PCBs
 
@@ -157,7 +165,7 @@ Two NES controllers give you a two-player setup; a USB controller for player 1 a
 #### Which binary to flash
 
 - Pico 2 **and** Pimoroni Pico Plus 2 — `picogenesisPlus_AdafruitDVISD_pico2_arm.uf2`
-- Pico 2 W — `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2`
+- Pico 2 W — `picogenesisPlus_AdafruitDVISD_pico2_w_arm.uf2` (untested on real hardware)
 
 The Pimoroni Pico Plus 2 needs no separate build. The emulator reads the real flash size from the chip at boot and detects PSRAM at runtime, so the same `pico2` image adapts to whichever board is plugged in.
 
@@ -246,7 +254,7 @@ Gamepad buttons:
 - Button1: back to the parent folder.
 - START: show [box art and game info](#box-art-and-game-info).
 - Button3: show the list of [recently played games](#recently-played-games).
-- SELECT: open the settings menu. Here you can change things like the screen mode, scanlines, the framerate display, the menu colours and settings specific to your board. The same menu can be opened while a game is running.
+- SELECT: open the settings menu. Here you can change things like the screen mode, scanlines, the game sound, [frame skip](#frame-skip), the framerate display, the menu colours and settings specific to your board. The same menu can be opened while a game is running.
 
 When using a USB keyboard:
 - Cursor keys: up, down, left, right
@@ -255,6 +263,20 @@ When using a USB keyboard:
 - S: show box art and game info
 - C: show the list of recently played games
 - A: acts as the SELECT button
+
+### Frame skip
+
+**Frame Skip** in the settings menu draws two out of every three frames instead of all of
+them. The game itself keeps running at full speed — only the picture is refreshed less
+often, which is what keeps the action and the sound up to speed. It is switched on by
+default.
+
+European (PAL) games run at 50 Hz and so leave more time for each frame. Frame Skip can
+usually be switched off for those, which gives a smoother picture without slowing the game
+down. Try it and switch it back on if the game starts to drag.
+
+Switching the game sound off in the settings menu switches Frame Skip off as well: without
+sound to keep up with, there is room to draw every frame.
 
 ## Recently played games
 
@@ -300,7 +322,7 @@ When using a USB keyboard:
 
 Cartridges that carried a battery-backed memory chip — *Sonic the Hedgehog 3*, *Sonic & Knuckles*, the *Phantasy Star* and *Shining Force* games, *Story of Thor*, the NHL series and many more — can save, and the save is kept on the SD card. Nothing to switch on: a game that has save memory picks it up when it starts.
 
-The save is written back when you quit the game, when you reset it, and when you open the settings menu with SELECT + START. That last one is what makes it safe to leave through **Enter bootsel mode** or **Return to emulator selection menu**, which restart the board there and then. Nothing is written while you are playing, so switching the board off in the middle of a game loses whatever the game has saved since you last opened the menu — open the menu first if you have just saved and want to be sure.
+The save is written back when you quit the game, when you reset it, and when you open the settings menu with SELECT + START. That last one is what makes it safe to leave through **Enter bootsel mode** or **Return to emulator selection menu** ([bootloader builds only](#several-emulators-on-one-board)), which restart the board there and then. Nothing is written while you are playing, so switching the board off in the middle of a game loses whatever the game has saved since you last opened the menu — open the menu first if you have just saved and want to be sure.
 
 The files live in the `/SAVES` folder on the card, one per game, named after the rom with a `.srm` extension. They are 64 KB and use the same layout as Genesis Plus GX and Kega, so a save can be copied to a PC emulator and back.
 
@@ -318,9 +340,11 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 
 ## Known limitations
 
-- **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games).
-- **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console -- there is no setting to force 50 Hz.
-- **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example.
+- **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games). ([#20](https://github.com/fhoedemakers/pico-genesisPlus/issues/20))
+- **Roms larger than 4 MB do not work.** They need bank switching that is not emulated, so a game such as *Super Street Fighter II* breaks as soon as it reaches past the first 4 MB. On a board with PSRAM such a rom is large enough to fit in memory and will start, so this is one to avoid rather than one the menu keeps out of your way. ([#21](https://github.com/fhoedemakers/pico-genesisPlus/issues/21))
+- **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console — there is no setting to force 50 Hz. ([#24](https://github.com/fhoedemakers/pico-genesisPlus/issues/24))
+- **Sound is mono.** Both sound chips are mixed into one channel that goes to the left and the right speaker alike, so a game that puts a sound on one side — the stereo effects in *Sonic* or *Streets of Rage* — plays it in the middle instead. ([#22](https://github.com/fhoedemakers/pico-genesisPlus/issues/22))
+- **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example. ([#23](https://github.com/fhoedemakers/pico-genesisPlus/issues/23))
 - **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
 - **Games run slower on PicoDVI boards.** Boards without HSTX cannot keep up with full speed, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.
