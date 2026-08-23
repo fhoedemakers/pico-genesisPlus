@@ -44,10 +44,34 @@ extern int gwsram_bankable;     /* ROM reaches into the window: $A130F1 controls
 extern int gwsram_battery;      /* header says the RAM is battery backed */
 extern int gwsram_protect;      /* $A130F1 bit 1: writes ignored */
 extern int gwsram_dirty;        /* the game wrote to it since the last save */
+extern int gwsram_oom;          /* save RAM is declared but could not be had */
+extern int gwsram_in_psram;     /* buffer lives in PSRAM, not the SRAM heap */
 
 /* Parse the cart header. Safe to call with any image; resets all state first,
    so nothing survives from the previously played game. */
 void gwsram_detect(const unsigned char *rom, size_t romSize);
+
+/* Obtain the buffer, allocating on first use. Returns 0 if the cart has no
+   save RAM or the memory could not be had.
+
+   The allocation is deferred rather than done at game start because SGDK puts
+   a save-RAM declaration in the header of every game it builds, used or not,
+   and its default asks for the whole $200000-$20FFFF window -- 32 KB packed,
+   against roughly 10 KB of SRAM heap left once the emulator's fixed buffers
+   are up. Allocating that eagerly would cost every SGDK title its saves (and,
+   before the guard, panicked the board), when the overwhelming majority never
+   touch save RAM at all. Nothing is allocated until a game actually writes,
+   or until a .srm turns up for it on the card. */
+int gwsram_ensure_buffer(void);
+
+/* Release the buffer; called from free_emulator_mem(). */
+void gwsram_release(void);
+
+/* Supplied by the port (main.cpp on the firmware, host_main.c on the harness):
+   a non-panicking PSRAM allocator, or NULL when the board has no PSRAM. Used
+   only when the SRAM heap cannot take the buffer. */
+void *gwsram_port_psram_alloc(size_t size);
+void gwsram_port_psram_free(void *p);
 
 /* $A130F1 (the /TIME region): bit 0 maps save RAM in over the ROM, bit 1 write
    protects it. Only meaningful for carts whose ROM reaches past gwsram_start. */

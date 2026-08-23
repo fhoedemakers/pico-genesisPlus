@@ -16,6 +16,9 @@
 #include "FrensFonts.h"
 #include "vumeter.h"
 #include "menu_settings.h"
+#if PICO_RP2350 && PSRAM_CS_PIN
+#include "PicoPlusPsram.h"
+#endif
 
 /* Gwenesis emulator core (vendored upstream + port patches, see
    gwenesis/PORTING.md) and the port layer around it. */
@@ -241,9 +244,36 @@ static FRESULT writeSrmSpan()
     return FR_OK;
 }
 
+/* Non-panicking PSRAM allocator for port/gwsram.c. Frens::f_malloc panics on
+   failure, which is no use as a fallback, so go through PicoPlusPsram
+   directly. Returns nullptr when the board has no PSRAM. */
+extern "C" void *gwsram_port_psram_alloc(size_t size)
+{
+#if PICO_RP2350 && PSRAM_CS_PIN
+    if (Frens::isPsramEnabled())
+    {
+        return PicoPlusPsram::getInstance().Malloc(size);
+    }
+#endif
+    (void)size;
+    return nullptr;
+}
+
+extern "C" void gwsram_port_psram_free(void *p)
+{
+#if PICO_RP2350 && PSRAM_CS_PIN
+    if (p && Frens::isPsramEnabled())
+    {
+        PicoPlusPsram::getInstance().Free(p);
+    }
+#else
+    (void)p;
+#endif
+}
+
 static void loadCartSram()
 {
-    if (!gwsram_data || !gwsram_span)
+    if (!gwsram_span)
     {
         return;
     }
@@ -261,6 +291,16 @@ static void loadCartSram()
     {
         snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot open save file: %d", fr);
         printf("%s (%s)\n", ErrorMessage, srmPath);
+        return;
+    }
+
+    /* A save file exists, so this cart really does use its save RAM: this is
+       the other trigger for the deferred allocation. */
+    if (!gwsram_ensure_buffer())
+    {
+        snprintf(ErrorMessage, ERRORMESSAGESIZE, "No memory to load saved game");
+        printf("%s (%s)\n", ErrorMessage, srmPath);
+        f_close(&srmFile);
         return;
     }
 

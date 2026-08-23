@@ -183,6 +183,20 @@ static const unsigned char *load_rom(const char *path, size_t *size_out)
 
 /* --------------------------- save RAM ------------------------------ */
 
+/* The harness has no PSRAM, so port/gwsram.c's fallback finds nothing. The
+   SRAM path never fails on a PC, so this is only ever reached in tests that
+   deliberately force it. */
+void *gwsram_port_psram_alloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+void gwsram_port_psram_free(void *p)
+{
+    (void)p;
+}
+
 /* The firmware's .srm layout: a flat 64 KB image of the $200000 page, file
    offset = address & 0xFFFF, 0xFF wherever nothing is backed. The interleave
    itself is gwsram_export/gwsram_import, the same code main.cpp streams
@@ -195,7 +209,7 @@ static void srm_load(const char *path)
     uint8_t *flat;
     FILE *f;
 
-    if (!gwsram_data || !gwsram_span)
+    if (!gwsram_span)
         return;
     f = fopen(path, "rb");
     if (!f) {
@@ -208,6 +222,11 @@ static void srm_load(const char *path)
         printf("srm: %s is empty\n", path);
     fclose(f);
 
+    if (!gwsram_ensure_buffer()) {
+        printf("srm: no memory for cartridge RAM, %s not loaded\n", path);
+        free(flat);
+        return;
+    }
     gwsram_import(0, flat + (gwsram_start & 0xFFFF), gwsram_span);
     free(flat);
     gwsram_dirty = 0;
@@ -257,6 +276,8 @@ static int srm_selftest(void)
     /* A bankable cart hides save RAM behind $A130F1 until the game asks. */
     if (gwsram_bankable)
         m68k_write_memory_8(0xA130F1, 1);
+    printf("selftest: buffer before first write: %s\n",
+           gwsram_data ? "allocated" : "not yet (deferred)");
 
     for (i = 0; i < 8 && i * 2 < gwsram_span; i++) {
         addr = gwsram_start + i * 2 + (gwsram_packed ? (unsigned)gwsram_odd : 1u);

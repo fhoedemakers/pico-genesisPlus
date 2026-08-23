@@ -267,6 +267,8 @@ The save is written back when you quit the game, when you reset it, and when you
 
 The files live in the `/SAVES` folder on the card, one per game, named after the rom with a `.srm` extension. They are 64 KB and use the same layout as Genesis Plus GX and Kega, so a save can be copied to a PC emulator and back.
 
+Some games — many of the homebrew ones built with SGDK — declare a much larger save memory than they use. On a board with PSRAM those get their memory there, which costs nothing since save memory is only touched when a game loads or stores progress. On a board without PSRAM such a game plays normally but cannot save, and says so on the serial console.
+
 Two kinds of cartridge are not covered:
 - Games with a serial EEPROM instead of a RAM chip: *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*. They play, but cannot save.
 - Games that saved to something other than the cartridge, such as the Sega CD backup RAM.

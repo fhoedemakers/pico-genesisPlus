@@ -47,6 +47,10 @@ including the games that had no sound effects at all before.
 - The files are in `/SAVES` on the card, named after the rom with a `.srm`
   extension, in the same format Genesis Plus GX and Kega use — so a save can be
   carried to a PC emulator and back.
+- Memory for a game's save is only claimed once the game actually uses it, so the
+  many homebrew games that declare a save memory they never touch cost nothing.
+  Games that declare a large one — common with SGDK — use PSRAM when the board has
+  it; on a board without PSRAM they play normally but cannot save.
 - Cartridges with a serial EEPROM rather than a RAM chip (*Wonder Boy in Monster
   World*, *NBA Jam*, *Micro Machines 2*, *Mega Man: The Wily Wars*) still cannot
   save. They need a different chip emulated, which is not in this release.

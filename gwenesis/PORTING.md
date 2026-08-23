@@ -243,6 +243,14 @@ and the sound-seam prototypes (`gwsnd_ym_write` / `gwsnd_ym_read` /
   same header field save RAM uses; `gwsram_detect()` recognises them and
   leaves the window unmapped, so they behave as they did before save RAM
   existed. Supporting them needs an I2C device model and a per-game table.
+- Cartridge save RAM is allocated on first use, not at game start, and
+  falls back to PSRAM when the SRAM heap cannot take it. SGDK puts a
+  save-RAM declaration in every game it builds whether the game uses it or
+  not, and its default asks for the whole `$200000-$20FFFF` window: 32 KB
+  packed, against roughly 10 KB of SRAM heap left once the fixed buffers
+  are up. Chip width comes from the type byte at `$1B2` alone — SGDK's
+  header pairs an odd-byte type with an even start and an odd end, so the
+  range parity is not a usable cross-check. See `port/gwsram.c`.
 - VDP DMA reads cartridge space through `FETCH16ROM()`
   (`gwenesis_vdp_dma_m68k`), bypassing the bus, so a DMA sourced from save
   RAM would transfer ROM. No known game does this — save RAM is byte-wide

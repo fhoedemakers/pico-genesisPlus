@@ -7,6 +7,11 @@ for the many carts that declare a nonsensical range.
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#if !defined(GWENESIS_HOST) || GWENESIS_HOST == 0
+#include <malloc.h>
+#endif
 
 #include "gwenesis_port.h"
 #include "gwsram.h"
@@ -27,6 +32,13 @@ int gwsram_bankable;
 int gwsram_battery;
 int gwsram_protect;
 int gwsram_dirty;
+int gwsram_oom;
+int gwsram_in_psram;
+
+/* Trailing guard word, same idea as port/buffers.c: an overrun would land on
+   the allocator's chunk header and only surface much later as an
+   unattributable fault. */
+#define GWSRAM_GUARD 0xA5C3F00Du
 
 /* The loader byte-swaps every 16-bit word of the image for the core's
    little-endian fetches, so the byte at file offset N lives at [N ^ 1] —
@@ -45,7 +57,6 @@ static uint32_t hdr32(const unsigned char *rom, uint32_t off)
 void gwsram_detect(const unsigned char *rom, size_t romSize)
 {
     uint32_t type, start, end;
-    int type_byte_wide, range_byte_wide;
 
     /* The firmware never reboots between games, so every global has to be put
        back rather than assumed zero. */
@@ -60,6 +71,8 @@ void gwsram_detect(const unsigned char *rom, size_t romSize)
     gwsram_battery = 0;
     gwsram_protect = 0;
     gwsram_dirty = 0;
+    gwsram_oom = 0;
+    gwsram_in_psram = 0;
 
     if (!rom || romSize < 0x200)
         return;
@@ -85,17 +98,33 @@ void gwsram_detect(const unsigned char *rom, size_t romSize)
     if (end > SRAM_WINDOW_HIGH)
         end = SRAM_WINDOW_HIGH;
 
-    /* Chip width. Bits 4-3 of the type byte say odd-only (%11), even-only
-       (%10) or word-wide (%00), but enough headers get it wrong that it is
-       cross-checked against the parity of the declared range: a byte-wide chip
-       covers one parity only, so its start and end have the same one. When the
-       two disagree, fall back to the word-wide layout, which is never wrong,
-       only twice as large. */
-    type_byte_wide = (type & 0x18u) != 0;
-    range_byte_wide = ((start ^ end) & 1u) == 0;
+    /* Chip width, from bits 4-3 of the type byte: %11 = a chip on the odd
+       bytes, %10 = on the even bytes, %00 = a word-wide device.
 
-    gwsram_packed = type_byte_wide && range_byte_wide;
-    gwsram_odd = gwsram_packed ? (int)(start & 1u) : 0;
+       The declared range is not a usable second opinion. SGDK's default header
+       pairs an odd-byte type with the whole $200000-$20FFFF window, so its
+       start and end have different parities; treating that disagreement as
+       "assume word-wide" doubled the allocation to 64 KB and mapped a parity
+       the chip does not drive. The range is only consulted when the type byte
+       encodes no valid width. */
+    switch (type & 0x18u) {
+    case 0x18u: /* odd bytes only -- Sonic 3, and SGDK's default */
+        gwsram_packed = 1;
+        gwsram_odd = 1;
+        break;
+    case 0x10u: /* even bytes only */
+        gwsram_packed = 1;
+        gwsram_odd = 0;
+        break;
+    case 0x00u: /* word wide */
+        gwsram_packed = 0;
+        gwsram_odd = 0;
+        break;
+    default: /* %01 is not a defined width: fall back on the range's parity */
+        gwsram_packed = ((start ^ end) & 1u) == 0;
+        gwsram_odd = gwsram_packed ? (int)(start & 1u) : 0;
+        break;
+    }
 
     gwsram_start = start & ~1u;
     gwsram_span = (end | 1u) - gwsram_start + 1u;
@@ -127,12 +156,94 @@ void gwsram_detect(const unsigned char *rom, size_t romSize)
        ROM wins until the game asks for save RAM. */
     gwsram_bankable = romSize > gwsram_start;
 
+    /* The window is mapped from the start; the buffer behind it is not
+       allocated until something actually needs it (see gwsram_ensure_buffer).
+       A bankable cart stays switched out until the game asks via $A130F1. */
+    gwsram_live = gwsram_bankable ? 0 : gwsram_span;
+
     printf("SRAM: %06x-%06x, %s, %s, %u bytes%s\n",
            (unsigned)gwsram_start, (unsigned)(gwsram_start + gwsram_span - 1),
            gwsram_packed ? (gwsram_odd ? "odd bytes" : "even bytes") : "word wide",
            gwsram_battery ? "battery backed" : "no battery",
            (unsigned)gwsram_bytes,
            gwsram_bankable ? ", banked over ROM via $A130F1" : "");
+}
+
+/* Would `need` bytes fit on the SRAM heap? keepcost is the top-most free
+   block, and by this point every fixed emulator buffer is already taken, so
+   that block is the remaining free space. Underestimating only sends the
+   buffer to PSRAM; overestimating panics, because PICO_MALLOC_PANIC is 1. */
+static int fits_in_sram_heap(size_t need)
+{
+#if defined(GWENESIS_HOST) && GWENESIS_HOST != 0
+    (void)need;
+    return 1;
+#else
+    struct mallinfo mi = mallinfo();
+    return (size_t)mi.keepcost >= need + 2048; /* leave the heap some room */
+#endif
+}
+
+int gwsram_ensure_buffer(void)
+{
+    size_t need;
+
+    if (gwsram_data)
+        return 1;
+    if (!gwsram_span || gwsram_oom)
+        return 0;
+
+    need = gwsram_bytes + 4; /* + guard word */
+
+    if (fits_in_sram_heap(need)) {
+        gwsram_data = malloc(need);
+        if (gwsram_data)
+            printf("cart SRAM: %u bytes allocated in SRAM\n",
+                   (unsigned)gwsram_bytes);
+    } else {
+        printf("cart SRAM: %u bytes will not fit the SRAM heap, trying PSRAM\n",
+               (unsigned)gwsram_bytes);
+    }
+
+    if (!gwsram_data) {
+        gwsram_data = gwsram_port_psram_alloc(need);
+        if (gwsram_data) {
+            gwsram_in_psram = 1;
+            printf("cart SRAM: %u bytes allocated in PSRAM (save RAM is only "
+                   "touched when a game loads or stores its progress)\n",
+                   (unsigned)gwsram_bytes);
+        }
+    }
+
+    if (!gwsram_data) {
+        gwsram_oom = 1;
+        printf("cart SRAM: could not allocate %u bytes in SRAM or PSRAM - this "
+               "game will run but cannot save\n", (unsigned)gwsram_bytes);
+        return 0;
+    }
+
+    /* An SRAM chip that has never been written reads back as 0xFF; games check
+       for their own magic and format it themselves. */
+    memset(gwsram_data, 0xFF, gwsram_bytes);
+    *(volatile uint32_t *)(gwsram_data + gwsram_bytes) = GWSRAM_GUARD;
+    return 1;
+}
+
+void gwsram_release(void)
+{
+    if (gwsram_data) {
+        if (*(volatile uint32_t *)(gwsram_data + gwsram_bytes) != GWSRAM_GUARD)
+            printf("HEAP GUARD CLOBBERED: cart SRAM overran\n");
+        printf("cart SRAM: releasing %u bytes from %s\n",
+               (unsigned)gwsram_bytes, gwsram_in_psram ? "PSRAM" : "SRAM");
+        if (gwsram_in_psram)
+            gwsram_port_psram_free(gwsram_data);
+        else
+            free(gwsram_data);
+    }
+    gwsram_data = NULL;
+    gwsram_in_psram = 0;
+    gwsram_live = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -142,8 +253,13 @@ void gwsram_detect(const unsigned char *rom, size_t romSize)
 
 unsigned int GW_SRAM_FUNC(gwsram_read8)(unsigned int address)
 {
-    unsigned int off = address - gwsram_start;
+    unsigned int off;
 
+    /* Nothing written yet, so nothing allocated yet: an unwritten chip. */
+    if (!gwsram_data)
+        return 0xFF;
+
+    off = address - gwsram_start;
     if (gwsram_packed) {
         if ((int)(off & 1u) != gwsram_odd)
             return 0xFF; /* the half the chip does not drive */
@@ -157,6 +273,9 @@ void GW_SRAM_FUNC(gwsram_write8)(unsigned int address, unsigned int value)
     unsigned int off;
 
     if (gwsram_protect)
+        return;
+    /* First write is what proves the game really uses its save RAM. */
+    if (!gwsram_data && !gwsram_ensure_buffer())
         return;
     off = address - gwsram_start;
     if (gwsram_packed) {
@@ -240,7 +359,7 @@ void GW_SRAM_FUNC(gwsram_time_write)(unsigned int address, unsigned int value)
        register; Genesis Plus GX does not even install a handler for the
        others. Honouring it regardless would let a stray write protect or
        unmap save RAM the cart has no way of switching. */
-    if (!gwsram_span || !gwsram_data || !gwsram_bankable)
+    if (!gwsram_span || !gwsram_bankable)
         return;
 
     gwsram_protect = (value & 2u) != 0;
