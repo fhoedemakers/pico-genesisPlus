@@ -12,10 +12,13 @@
 /**     commercially. Please, notify me, if you make any    **/   
 /**     changes to this file.                               **/
 /*************************************************************/
-#pragma GCC optimize("Ofast")
+#if GNW_TARGET_MARIO !=0 || GNW_TARGET_ZELDA!=0
+  #pragma GCC optimize("Ofast")
+#endif
 
 #define GENESIS 1
 
+#include "gwenesis_port.h"
 #include "Z80.h"
 #include "Tables.h"
 #include <stdio.h>
@@ -62,8 +65,15 @@ INLINE byte OpZ80(word A) { return(RAM[A>>13][A&0x1FFF]); }
 
 #ifdef GENESIS
 #define FAST_RDOP
-extern byte *Z80_RAM[];
-INLINE byte OpZ80(word A) { return(Z80_RAM[A>>13][A&0x1FFF]); }
+/* Upstream declared "extern byte *Z80_RAM[]" (a page table) here, but
+   z80inst.c defines Z80_RAM as a single base pointer — any opcode fetch at
+   A >= 0x2000 (e.g. SGDK drivers running from the 2000-3FFF RAM mirror)
+   indexed past the pointer and dereferenced garbage. Fetch through the
+   same semantics as the data path instead: RAM+mirror below 4000, full
+   RdZ80 decode (YM/bank window) above. */
+extern byte *Z80_RAM;
+byte RdZ80(word Addr);
+INLINE byte OpZ80(word A) { return A < 0x4000 ? Z80_RAM[A & 0x1FFF] : RdZ80(A); }
 #endif
 
 /** FAST_RDOP ************************************************/

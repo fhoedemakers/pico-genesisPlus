@@ -392,3 +392,18 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# Host harness (hosttest/): test ROMs and outputs are never committed.
+# Genesis ROMs use .md — do NOT add a global *.md ignore (docs use it too);
+# the rule is scoped to the roms directory instead.
+hosttest/roms/*
+!hosttest/roms/README.md
+hosttest/out*/
+hosttest/gen_host
+hosttest/lutgen
+hosttest/**/*.ppm
+hosttest/**/*.png
+hosttest/**/*.wav
+
+# bootloader-variant build output (bld.sh -b), like releases/
+releases_bl/

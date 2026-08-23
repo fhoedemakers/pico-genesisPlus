@@ -43,16 +43,35 @@ __license__ = "GPLv3"
 #define GWENESIS_REFRESH_RATE_PAL 50
 #define GWENESIS_AUDIO_FREQ_PAL 52781
 
+#define GWENESIS_AUDIO_ACCURATE 1
+
+/* Upstream runs the Z80 at MCLK/14 (~7% fast; hardware is MCLK/15).
+   Overridable from the build so 15 can be A/B-tested (affects XGM1 PCM
+   pitch — see PORTING.md). */
+#ifdef GWENESIS_Z80_DIVISOR
+#define Z80_FREQ_DIVISOR GWENESIS_Z80_DIVISOR
+#else
 #define Z80_FREQ_DIVISOR 14     // Frequency divisor to Z80 clock
+#endif
 #define VDP_CYCLES_PER_LINE 3420// VDP Cycles per Line
-#define GWENESIS_SCREEN_WIDTH 320
-#define GWENESIS_SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 320
 
-extern uint8_t GWENESIS_AUDIO_SAMPLING_DIVISOR; // Audio quality (i.e. sampling rate) 1: best ... 10: poor
-
-#define AUDIO_FREQ_DIVISOR 1009  //1009
+#define AUDIO_FREQ_DIVISOR 1009
 #define GWENESIS_AUDIO_BUFFER_LENGTH_NTSC 888
-#define GWENESIS_AUDIO_BUFFER_LENGTH_PAL 1056
+/* Upstream said 1056, but a PAL frame generates up to
+   313*3420/1009 = 1060.9 samples — the end-of-frame top-up overflowed
+   both audio buffers by ~5 samples. 1072 = 1061 rounded up with margin. */
+#define GWENESIS_AUDIO_BUFFER_LENGTH_PAL 1072
+
+/* Hard ceiling for the per-frame sample index of both chips. The chips
+   derive their index from caller-supplied master-clock timestamps
+   (index = target / AUDIO_FREQ_DIVISOR), so a timestamp beyond the end of
+   a frame writes past the audio buffers and corrupts the heap. Clamp
+   rather than trust the timestamp. */
+#define GWENESIS_AUDIO_BUFFER_MAX GWENESIS_AUDIO_BUFFER_LENGTH_PAL
+
+/* Reports the first clamp per chip (port/buffers.c). */
+void gwenesis_audio_report_clamp(const char *chip, int index, int target);
 
 /* Audio buffer length */
 
@@ -71,7 +90,11 @@ enum mapped_address
     Z80_CTRL,
     TMSS_CTRL,
     VDP_ADDR,
-    RAM_ADDR
+    RAM_ADDR,
+    /* Port additions (append only, so upstream values do not shift):
+       cartridge save RAM and the /TIME region that controls it. */
+    SRAM_ADDR,
+    TIME_CTRL
 };
 
 enum gwenesis_bus_pad_button
@@ -83,10 +106,16 @@ enum gwenesis_bus_pad_button
     PAD_B,
     PAD_C,
     PAD_A,
-    PAD_S,
+    PAD_S
 };
 
-void load_cartridge(uintptr_t rom);
+#if GWENESIS_PICO != 0
+void load_cartridge(const unsigned char *buffer, size_t size);
+#elif GNW_TARGET_MARIO != 0 | GNW_TARGET_ZELDA != 0
+void load_cartridge();
+#else
+void load_cartridge(unsigned char *buffer, size_t size);
+#endif
 
 void power_on();
 void reset_emulation();

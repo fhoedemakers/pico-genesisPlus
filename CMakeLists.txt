@@ -68,6 +68,12 @@ add_executable(${projectname}
     splash.cpp
     DefaultSS444.c
     DefaultSS555.c
+    port/buffers.c
+    port/gwsnd_core0.c
+    port/gwsnd_resample.c
+    port/gwsnd_shadow.c
+    port/savestate_stubs.c
+    port/gwsram.c
 )
 
 pico_set_program_name(${projectname} "${projectname}")
@@ -88,8 +94,22 @@ pico_enable_stdio_usb(${projectname} 0)
 #   * RP2040-E5 USB device enumeration fix
 #   * Silence harmless warnings from TinyUSB / pico-pio-usb sources
 # ---------------------------------------------------------------------------
+# Cartridge save RAM (battery-backed SRAM -> /SAVES/<rom>.srm). On by default.
+# Building with -DGENESIS_CART_SRAM=0 compiles the save-RAM test out of the
+# 68000 read paths and the bus mapper, so the emulator can be measured with and
+# without it on the same board and scene when attributing a frame-rate or
+# audio-underrun change. Saves do not work in such a build.
+if (NOT DEFINED GENESIS_CART_SRAM)
+    set(GENESIS_CART_SRAM 1 CACHE STRING "Emulate cartridge save RAM (1) or compile it out for perf A/B (0)")
+endif()
+message("Cartridge save RAM: ${GENESIS_CART_SRAM}")
+
 target_compile_definitions(${projectname} PRIVATE
     PICO_RP2040_USB_DEVICE_ENUMERATION_FIX=1
+)
+
+target_compile_definitions(${projectname} PUBLIC
+    GENESIS_CART_SRAM=${GENESIS_CART_SRAM}
 )
 
 target_compile_options(${projectname} PRIVATE
@@ -145,8 +165,31 @@ target_compile_definitions(${projectname} PUBLIC
     # FrensHelpers::setClocksAndStartStdio only honors this when PIO-USB is in use
     # (PLL_USB must stay at 48 MHz for native TinyUSB).
     GENESIS_OVERCLOCK_HSTX_FIX=1
-    #DVIAUDIOFREQ=53280  # 53.28kHz audio sample rate for DVI output
+    PICO_FLASH_SIZE_BYTES=16777216  # Real size determined at runtime.
 )
+
+# The gwenesis core renders directly into the display framebuffer, so its
+# CRAM->pixel conversion must match the video driver's format:
+# HSTX (pico_hdmi) = RGB555, PicoDVI = RGB444. See gwenesis/gwenesis_port.h.
+# Same condition as the HSTX macro in pico_shared/FrensHelpers.h: all four
+# HSTX pins configured (BoardConfigs only sets them for HSTX-capable boards
+# when USE_HSTX=1 and FORCE_DVI=0; HSTX pins are never GPIO 0).
+if(GPIOHSTXD0 AND GPIOHSTXD1 AND GPIOHSTXD2 AND GPIOHSTXCK)
+    target_compile_definitions(${projectname} PUBLIC GWENESIS_PIXEL_FMT=555)
+    # HSTX: sound synthesis is offloaded to core1 (the pico_hdmi background
+    # task); core0 keeps a shadow of the YM2612 timers for status reads.
+    target_compile_definitions(${projectname} PUBLIC GWSND_OFFLOAD=1)
+    # The audio backlog is held at DI_TARGET_PACKETS (160) so a run of
+    # heavy frames cannot walk the data-island ring empty and splice in
+    # silence packets. The driver's default drop watermark of 200 sits too
+    # close to that: peaks would be discarded instead, trading underruns
+    # for dropped samples. Raise it; the ring is 256 entries and this is a
+    # threshold only, so it costs no memory.
+    target_compile_definitions(${projectname} PUBLIC HSTX_AUDIO_DI_HIGH_WATERMARK=240)
+    target_sources(${projectname} PRIVATE port/gwsnd_core1.c)
+else()
+    target_compile_definitions(${projectname} PUBLIC GWENESIS_PIXEL_FMT=444)
+endif()
 if(NOT PICO_PLATFORM STREQUAL "rp2040")
     message(STATUS "Using PICO_PIO_USE_GPIO_BASE=1 for non-rp2040 platforms.")
     target_compile_definitions(${projectname} PRIVATE
@@ -219,6 +262,7 @@ PRIVATE
     pico_lib
     tusb_xinput
     pico_shared
+    port
     .
 )
 add_subdirectory(pico_lib/dvi)
