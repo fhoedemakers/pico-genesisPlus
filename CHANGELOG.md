@@ -1,6 +1,6 @@
 # CHANGELOG
 
-> Games now run at full speed on HSTX boards, and the rebuilt emulator core brings greatly improved sound: music, noise effects, the "SEGAAA!" voice and the audio of SGDK games all work now, without dropouts in busy scenes. On top of that, games can save their progress, European (PAL) games run at the right speed, 256-wide games fill the screen, and starting one game after another is stable.
+Games now run at full speed on HSTX boards, and the rebuilt emulator core brings greatly improved sound: music, noise effects, the "SEGAAA!" voice and the audio of SGDK games all work now, without dropouts in busy scenes. On top of that, games can save their progress, European (PAL) games run at the right speed, 256-wide games fill the screen, and starting one game after another is stable.
 
 # General Info
 
