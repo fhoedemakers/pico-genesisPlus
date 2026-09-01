@@ -6,7 +6,7 @@ Based on [Gwenesis](https://github.com/bzhxx/gwenesis) by bzhxx.
 
 ## Getting started
 
-1. **Flash the firmware.** Pick the `.uf2` for your board from the [supported boards](#supported-boards) table and download it from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest). Hold the BOOTSEL button while you connect the board to your computer, then copy the file to the drive that appears.
+1. **Flash the firmware.** Pick the `.uf2` for your board from the [supported boards](#supported-boards) table and download it from the [releases page](https:///github.com/PicoPlus-devel/pico-genesisPlus/releases/latest). Hold the BOOTSEL button while you connect the board to your computer, then copy the file to the drive that appears.
 2. **Prepare an SD card.** Format it as FAT32 (recommended) or exFAT and copy your roms into a `/roms/MD` folder — that is where the menu opens, and it falls back to the root of the card when the folder is not there. Subfolders are fine, the menu lets you browse them. Needless to say, you must own the games you put on the card.
 3. **Add box art (optional).** See [box art and game info](#box-art-and-game-info).
 4. **Insert the card, connect a controller and switch the board on.** Browse the card, pick a game and play. Settings are saved on the card automatically. On a board without PSRAM the screen stays blank for a while when a game starts, because the rom is written to flash first — see [PSRAM](#psram).
@@ -15,18 +15,20 @@ Wiring depends on the board. The hardware is the same as for the NES emulator, s
 
 | Board | Setup instructions |
 | ----- | ------------------ |
-| Adafruit Fruit Jam | [Fruit Jam](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#adafruit-fruit-jam) |
-| Pico 2 on a breadboard with Adafruit breakouts, or on the PicoNES PCB | [Adafruit hardware and breadboard](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) |
-| Adafruit Metro RP2350 | [Metro RP2350](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#adafruit-metro-rp2350) |
-| Pimoroni Pico DV Demo Base | [Pimoroni Pico DV Demo Base](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-for-pimoroni-pico-dv-demo-base) |
-| Pimoroni Pico Plus 2, wired the same as the Pico 2 above | [Adafruit hardware and breadboard](https://github.com/fhoedemakers/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) (needs v2.6 with male headers) |
+| Adafruit Fruit Jam | [Fruit Jam](https:///github.com/PicoPlus-devel/pico-infonesPlus/blob/main/README.md#adafruit-fruit-jam) |
+| Pico 2 on a breadboard with Adafruit breakouts, or on the PicoNES PCB | [Adafruit hardware and breadboard](https:///github.com/PicoPlus-devel/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) |
+| Adafruit Metro RP2350 | [Metro RP2350](https:///github.com/PicoPlus-devel/pico-infonesPlus/blob/main/README.md#adafruit-metro-rp2350) |
+| Pimoroni Pico DV Demo Base | [Pimoroni Pico DV Demo Base](https:///github.com/PicoPlus-devel/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-for-pimoroni-pico-dv-demo-base) |
+| Pimoroni Pico Plus 2, wired the same as the Pico 2 above | [Adafruit hardware and breadboard](https:///github.com/PicoPlus-devel/pico-infonesPlus/blob/main/README.md#raspberry-pi-pico-or-pico-2-setup-with-adafruit-hardware-and-breadboard), [PicoNES PCB](#picones-pcb) (needs v2.6 with male headers) |
 | PicoNES, PicoNES Mini or PicoNES Micro PCB | [Custom PCBs](#custom-pcbs) |
+
+
 
 ## Supported boards
 
 Everything runs on the RP2350 (Pico 2) with the arm core. RP2040 boards and RISC-V builds are not supported.
 
-Ready-made `.uf2` files for all of these are on the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest).
+Ready-made `.uf2` files for all of these are on the [releases page](https:///github.com/PicoPlus-devel/pico-genesisPlus/releases/latest).
 
 | Board | Video output | Build command | Release binary |
 | ----- | ------------ | ------------- | -------------- |
@@ -41,12 +43,12 @@ Ready-made `.uf2` files for all of these are on the [releases page](https://gith
 | [Spotpear HDMI board](https://spotpear.com/index/product/detail/id/1207.html) — *untested* | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c10 -2` | `picogenesisPlus_SpotpearHDMI_pico2_arm.uf2` |
 | Murmulator M1 — *untested* | PicoDVI, 77.1 Hz, runs slower | `./bld.sh -c12 -2` | `picogenesisPlus_MurmulatorM1_pico2_arm.uf2` |
 
-Boards marked *untested* build and are released, but have not been tried on real hardware. They also have no setup section in the table above: wire the Spotpear board according to [its own documentation](https://spotpear.com/index/product/detail/id/1207.html), and for the Murmulator boards see [murmulator.ru](https://murmulator.ru/) and [#150](https://github.com/fhoedemakers/pico-infonesPlus/issues/150).
+Boards marked *untested* build and are released, but have not been tried on real hardware. They also have no setup section in the table above: wire the Spotpear board according to [its own documentation](https://spotpear.com/index/product/detail/id/1207.html), and for the Murmulator boards see [murmulator.ru](https://murmulator.ru/) and [#150](https:///github.com/PicoPlus-devel/pico-infonesPlus/issues/150).
 
 > [!WARNING]
 > **Only HSTX boards deliver proper 60 Hz output and universal monitor compatibility; non‑HSTX (PicoDVI) builds set the refresh rate to 77.1 Hz and may be rejected by some displays.**  
 > The high refresh rate on non-HSTX boards is related to the high overclocking of the RP2350.
-> This can't be lowered using PicoDVI. See [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4)
+> This can't be lowered using PicoDVI. See [#4](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/4)
 > If you experience problems, try using a **different monitor or TV**.  
 > **Games also run slower on these boards**, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
 
@@ -95,11 +97,11 @@ Roms that are too large for the memory the board has are left out of the list in
 
 ### Other build configurations
 
-`bld.sh` has a few more configurations that belong to related projects but are not supported here: `-c3` and `-c4` are RP2040 boards, `-c7` (Waveshare RP2350-PiZero) is disabled because of [#7](https://github.com/fhoedemakers/pico-genesisPlus/issues/7), `-c11` is deprecated, and `-c14` (Adafruit Feather RP2350 with TLV320DAC3100) builds but has no release binary. Run `./bld.sh -h` for the full list of options.
+`bld.sh` has a few more configurations that belong to related projects but are not supported here: `-c3` and `-c4` are RP2040 boards, `-c7` (Waveshare RP2350-PiZero) is disabled because of [#7](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/7), `-c11` is deprecated, and `-c14` (Adafruit Feather RP2350 with TLV320DAC3100) builds but has no release binary. Run `./bld.sh -h` for the full list of options.
 
 ### Several emulators on one board
 
-The binaries above are standalone: one board, one emulator. With [pico-bootLoader](https://github.com/fhoedemakers/pico-bootLoader) you can instead keep several emulators, and a *Doom* port, on the same board and pick one from an on-screen menu at power-on, without a computer. The bootloader and an SD card archive containing this emulator are on the [pico-bootLoader releases page](https://github.com/fhoedemakers/pico-bootLoader/releases).
+The binaries above are standalone: one board, one emulator. With [pico-bootLoader](https:///github.com/PicoPlus-devel/pico-bootLoader) you can instead keep several emulators, and a *Doom* port, on the same board and pick one from an on-screen menu at power-on, without a computer. The bootloader and an SD card archive containing this emulator are on the [pico-bootLoader releases page](https:///github.com/PicoPlus-devel/pico-bootLoader/releases).
 
 Started that way, the settings menu gains an extra item, **Return to emulator selection menu**, which takes you back to that boot menu. To build a bootloader version yourself, add `-b` to the build command, for example `./bld.sh -c8 -b`; the `.uf2` ends up in `releases_bl`.
 
@@ -113,9 +115,9 @@ Three community PCB designs turn a supported board and its breakouts into a fini
 | [PicoNES Mini](#picones-mini-pcb) | Waveshare RP2350-Zero | `-c6` | `Gerber_PicoNES_Mini_PCB_v2.0.zip` | Gavin Knight |
 | [PicoNES Micro](#picones-micro-pcb) | Waveshare RP2350-USB-A | `-c9` | `Gerber_PicoNES_Micro_v1.2.zip` | Gavin Knight |
 
-All three archives are attached to every [release](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest) of this project and also live in [pico_shared/PCB](pico_shared/PCB). Upload the zip as-is to a PCB manufacturer of your choice; [PCBWay](https://www.pcbway.com/) and JLCPCB are both good options.
+All three archives are attached to every [release](https:///github.com/PicoPlus-devel/pico-genesisPlus/releases/latest) of this project and also live in [pico_shared/PCB](pico_shared/PCB). Upload the zip as-is to a PCB manufacturer of your choice; [PCBWay](https://www.pcbway.com/) and JLCPCB are both good options.
 
-The designs come from [pico-infonesPlus](https://github.com/fhoedemakers/pico-infonesPlus) and kept their NES-flavoured names, but there is nothing NES-specific about them — they are DVI, microSD and controller wiring, and this emulator runs on them just as well.
+The designs come from [pico-infonesPlus](https:///github.com/PicoPlus-devel/pico-infonesPlus) and kept their NES-flavoured names, but there is nothing NES-specific about them — they are DVI, microSD and controller wiring, and this emulator runs on them just as well.
 
 > [!NOTE]
 > Sellers on AliExpress have copied the PicoNES design and sell ready-made boards. For questions about those, contact the seller.
@@ -158,7 +160,7 @@ Design v2.6 added through-holes, so there are now two ways to fit the board:
 Two NES controllers give you a two-player setup; a USB controller for player 1 and a NES controller in either port for player 2 works just as well. Keep in mind that a NES controller has no C button — [SELECT stands in for it](#controllers-and-buttons) while a game runs.
 
 > [!NOTE]
-> You can also connect an SNES controller. The sockets speak the SNES protocol as well. The connectors differ, so a SNES pad needs a [SNES-to-NES adapter cable you make yourself](https://github.com/fhoedemakers/pico-snesPlus/blob/main/snestonescontroller.md) — one per socket. There also are ready made cables, but hard to find at the moment.  Some ready made cables simply don't work as expected.
+> You can also connect an SNES controller. The sockets speak the SNES protocol as well. The connectors differ, so a SNES pad needs a [SNES-to-NES adapter cable you make yourself](https:///github.com/PicoPlus-devel/pico-snesPlus/blob/main/snestonescontroller.md) — one per socket. There also are ready made cables, but hard to find at the moment.  Some ready made cables simply don't work as expected.
 
 <img width="480" alt="Two-player setup with NES controllers" src="https://github.com/user-attachments/assets/d40ed98f-4632-4161-986a-732d35290fac" />
 
@@ -182,7 +184,7 @@ Gavin Knight ([DynaMight1124](https://github.com/DynaMight1124)) designed an NES
 
 <img width="480" alt="Top cover with a button for BOOTSEL" src="https://github.com/user-attachments/assets/3c8f8990-51b9-4873-9054-64bb2cd6c300" />
 
-For the full photo gallery and assembly detail, see the [PCB section of the pico-infonesPlus documentation](https://github.com/fhoedemakers/pico-infonesPlus#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2).
+For the full photo gallery and assembly detail, see the [PCB section of the pico-infonesPlus documentation](https:///github.com/PicoPlus-devel/pico-infonesPlus#pcb-with-raspberry-pi-pico-or-pico-2-and-pimoroni-pico-plus-2).
 
 ### PicoNES Mini PCB
 
@@ -249,7 +251,7 @@ This applies to the vintage NES controller on the NES/SNES GPIO port, which has 
 
 The two sockets speak one protocol but the pads send their buttons in a different order, so the port works out for itself which one is plugged in. A NES pad says so on every read, and anything else is taken for a SNES pad — including a SNES pad behind a home-made adapter cable, which works fully from the first button press with no need to wake it up first. Both then get the mapping from the table above: on a NES pad B is Genesis A and A is Genesis B, and on a SNES pad B is Genesis A, A is Genesis B and X is Genesis C. SNES Y, L and R are not used, because the Genesis pad only has three buttons.
 
-One caveat: a NES pad is recognised by grounding the shift register outputs it does not use, which is what an original Nintendo pad does, and most aftermarket ones with it. A clone that leaves them floating cannot be told from a SNES pad, and its B button will do nothing. Its A button and SELECT still work, so it stays usable. To check a pad, open **Settings > Controller Test**, press a button and look at the `Sent by pad:` line — a top digit of `F` means the pad identifies itself properly. ([#28](https://github.com/fhoedemakers/pico-genesisPlus/issues/28))
+One caveat: a NES pad is recognised by grounding the shift register outputs it does not use, which is what an original Nintendo pad does, and most aftermarket ones with it. A clone that leaves them floating cannot be told from a SNES pad, and its B button will do nothing. Its A button and SELECT still work, so it stays usable. To check a pad, open **Settings > Controller Test**, press a button and look at the `Sent by pad:` line — a top digit of `F` means the pad identifies itself properly. ([#28](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/28))
 
 ## Menu
 
@@ -260,7 +262,7 @@ Gamepad buttons:
 - Button1: back to the parent folder.
 - START: show [box art and game info](#box-art-and-game-info).
 - Button3: show the list of [recently played games](#recently-played-games).
-- SELECT: open the settings menu. Here you can change things like the screen mode, scanlines, the game sound, [frame skip](#frame-skip), the framerate display, the menu colours and settings specific to your board. The same menu can be opened while a game is running.
+- SELECT: open the settings menu. Here you can change things like the screen mode, scanlines, the game sound, [frame skip](#frame-skip), [usb drive mode](#usb-drive-mode), the framerate display, the menu colours and settings specific to your board. The same menu can be opened while a game is running.
 
 When using a USB keyboard:
 - Cursor keys: up, down, left, right
@@ -270,7 +272,7 @@ When using a USB keyboard:
 - C: show the list of recently played games
 - A: acts as the SELECT button
 
-### Frame skip
+## Frame skip
 
 **Frame Skip** in the settings menu draws two out of every three frames instead of all of
 them. The game itself keeps running at full speed — only the picture is refreshed less
@@ -300,6 +302,23 @@ Starting a game from the rom browser adds it to the list, or moves it back to th
 The list is only available from the rom browser, not while a game is running.
 
 On boards without PSRAM, roms are copied into flash before they start. The game whose rom is already in flash is marked `[READY]`: starting it skips the copy and begins in about a second instead of the usual several. Any other game is copied to flash as before. This also applies to starting a game the normal way from the rom browser.
+
+## USB drive mode
+
+The SD card can be handed to a computer as an ordinary USB mass storage device, so games can be added or removed without moving the card to a card reader.
+
+Press **Select** in the ROM browser to open the settings menu, select **USB drive mode**, and connect the board's USB port to a computer. The emulator unmounts the card and it appears on the computer as a removable drive. Copy or delete files, then eject the drive on the computer: the emulator remounts the card and returns to the ROM browser, re-reading the current directory so that added or removed games are listed immediately.
+
+**B** also leaves the screen. If no computer has claimed the drive within twenty seconds, it closes by itself.
+
+Points to note:
+
+- The entry is present only when the settings menu is opened from the ROM browser.
+- Eject the drive on the computer before leaving the screen, as with any removable drive.
+- Gamepads on the GPIO controller ports, and USB controllers on boards that have a second USB port for them, keep working while the card is mounted.
+- A board with only one USB port needs that port for the computer, and is powered through it, so a USB controller cannot be attached at the same time and the cables cannot be exchanged while the emulator is running. Connect the board to the computer first and open the screen with a gamepad on a GPIO controller port. 
+- The card must be readable when the screen is opened. A missing or unreadable card is reported instead.
+
 
 ## While a game is running
 
@@ -340,21 +359,21 @@ Two kinds of cartridge are not covered:
 
 ## Box art and game info
 
-Download the metadata pack from the [releases page](https://github.com/fhoedemakers/pico-genesisPlus/releases/latest/download/GenesisPlusMetadata.zip) and extract its contents to the root of the SD card. It contains box art and game information for many games. Select a rom in the menu and press START to see it. The screensaver shows random box art.
+Download the metadata pack from the [releases page](https:///github.com/PicoPlus-devel/pico-genesisPlus/releases/latest/download/GenesisPlusMetadata.zip) and extract its contents to the root of the SD card. It contains box art and game information for many games. Select a rom in the menu and press START to see it. The screensaver shows random box art.
 
 <img width="1920" height="1080" alt="Menu showing box art and game information" src="https://github.com/user-attachments/assets/2d9a7663-1ea2-46b4-81d9-70c8f7478b5f" />
 
 ## Known limitations
 
-- **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games). ([#20](https://github.com/fhoedemakers/pico-genesisPlus/issues/20))
-- **Roms larger than 4 MB do not work.** They need bank switching that is not emulated, so a game such as *Super Street Fighter II* breaks as soon as it reaches past the first 4 MB. On a board with PSRAM such a rom is large enough to fit in memory and will start, so this is one to avoid rather than one the menu keeps out of your way. ([#21](https://github.com/fhoedemakers/pico-genesisPlus/issues/21))
-- **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console — there is no setting to force 50 Hz. ([#24](https://github.com/fhoedemakers/pico-genesisPlus/issues/24))
-- **Sound is mono.** Both sound chips are mixed into one channel that goes to the left and the right speaker alike, so a game that puts a sound on one side — the stereo effects in *Sonic* or *Streets of Rage* — plays it in the middle instead. ([#22](https://github.com/fhoedemakers/pico-genesisPlus/issues/22))
-- **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example. ([#23](https://github.com/fhoedemakers/pico-genesisPlus/issues/23))
-- **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https://github.com/fhoedemakers/pico-genesisPlus/issues/4).
+- **No saves on cartridges with a serial EEPROM**, such as *Wonder Boy in Monster World*, *NBA Jam*, *Micro Machines 2* and *Mega Man: The Wily Wars*. Ordinary battery-backed cartridges do save, see [Saved games](#saved-games). ([#20](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/20))
+- **Roms larger than 4 MB do not work.** They need bank switching that is not emulated, so a game such as *Super Street Fighter II* breaks as soon as it reaches past the first 4 MB. On a board with PSRAM such a rom is large enough to fit in memory and will start, so this is one to avoid rather than one the menu keeps out of your way. ([#21](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/21))
+- **Region follows the rom header.** A Europe-only rom runs at 50 Hz, everything else at 60 Hz. Multi-region roms (marked `JUE`) run at 60 Hz, as they would on an American console — there is no setting to force 50 Hz. ([#24](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/24))
+- **Sound is mono.** Both sound chips are mixed into one channel that goes to the left and the right speaker alike, so a game that puts a sound on one side — the stereo effects in *Sonic* or *Streets of Rage* — plays it in the middle instead. ([#22](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/22))
+- **No interlace mode.** The parts of a game that use it show a blank screen — the two-player mode of *Sonic the Hedgehog 2*, for example. ([#23](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/23))
+- **77.1 Hz on non-HSTX boards**, which not every monitor accepts. See the [warning above](#supported-boards) and [#4](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/4).
 - **Games run slower on PicoDVI boards.** Boards without HSTX cannot keep up with full speed, see [Speed on PicoDVI boards](#speed-on-picodvi-boards).
 - **Mega Drive roms only.** Files that are not Mega Drive roms are refused with a message instead of starting the emulator on whatever the file happens to contain.
-- **A NES pad clone on the GPIO port may lose its B button.** The port tells NES and SNES pads apart by the shift register outputs a NES pad does not use, which an original Nintendo pad grounds. A clone that leaves them floating is taken for a SNES pad, and on a SNES pad that button is Y, which the Genesis has nowhere to put. Its A button and SELECT still work, and the pad works normally in the menu — only in-game B is dead. See [NES and SNES pads on the GPIO port](#nes-and-snes-pads-on-the-gpio-port). ([#28](https://github.com/fhoedemakers/pico-genesisPlus/issues/28))
+- **A NES pad clone on the GPIO port may lose its B button.** The port tells NES and SNES pads apart by the shift register outputs a NES pad does not use, which an original Nintendo pad grounds. A clone that leaves them floating is taken for a SNES pad, and on a SNES pad that button is Y, which the Genesis has nowhere to put. Its A button and SELECT still work, and the pad works normally in the menu — only in-game B is dead. See [NES and SNES pads on the GPIO port](#nes-and-snes-pads-on-the-gpio-port). ([#28](https:///github.com/PicoPlus-devel/pico-genesisPlus/issues/28))
 
 ## For developers
 
@@ -363,7 +382,7 @@ Download the metadata pack from the [releases page](https://github.com/fhoedemak
 Clone the repository and run the build command for your board from the [supported boards](#supported-boards) table:
 
 ````bash
-git clone https://github.com/fhoedemakers/pico-genesisPlus.git
+git clone https:///github.com/PicoPlus-devel/pico-genesisPlus.git
 cd pico-genesisPlus
 git submodule update --init
 ./bld.sh -c8            # Adafruit Fruit Jam, see the table for other boards
@@ -459,5 +478,5 @@ Gwenesis is itself built out of other people's work:
 - fixing heap corruption and leftover state when one game is started after another
 - refusing files that are not Mega Drive roms
 - the `hosttest/` PC test harness
-- linking the emulator into a pinned slot for [pico-bootLoader](https://github.com/fhoedemakers/pico-bootLoader)
+- linking the emulator into a pinned slot for [pico-bootLoader](https:///github.com/PicoPlus-devel/pico-bootLoader)
 - general bug fixes, and rewrites of this readme and the changelog
