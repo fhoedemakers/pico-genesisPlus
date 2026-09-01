@@ -43,7 +43,8 @@ bool showSettings = false;
 static uint64_t start_tick_us = 0;
 static uint64_t fps = 0;
 static int fpsFrameCount = 0;
-static char fpsString[4] = "000";
+static char fpsString[16] = "00";
+static int fpsStringLen = 2;
 #if HSTX
 #define fpsfgcolor 0      // black (RGB555)
 #define fpsbgcolor 0x7FFF // white (RGB555)
@@ -167,7 +168,9 @@ const int8_t g_settings_visibility_md[MOPT_COUNT] = {
     [MOPT_ENTER_BOOTSEL_MODE]        = 1,
     [MOPT_CONTROLLER_TEST]           = 1,
     [MOPT_RECENT_GAMES]              = 1,  // Rom browser only; menu.cpp gates in-game
+    [MOPT_USB_DRIVE_MODE]            = 0,  // USB drive mode (menu.cpp force-shows this in the rom browser)
 };
+
 const uint8_t g_available_screen_modes_md[] = {
     0, // SCANLINE_8_7,
     0, // NOSCANLINE_8_7
@@ -1092,7 +1095,7 @@ static void drawFpsOverlay()
     {
         uint16_t *fpsBuffer = framebufferLine(line) + 5;
         int rowInChar = line % 8;
-        for (auto i = 0; i < 3; i++)
+        for (auto i = 0; i < fpsStringLen; i++)
         {
             char fontSlice = getcharslicefrom8x8font(fpsString[i], rowInChar);
             for (auto bit = 0; bit < 8; bit++)
@@ -1307,9 +1310,28 @@ void __not_in_flash_func(emulate)()
                 start_tick_us = Frens::time_us();
                 fpsFrameCount = 0;
             }
-            fpsString[0] = '0' + (fps / 100) % 10;
-            fpsString[1] = '0' + (fps / 10) % 10;
-            fpsString[2] = '0' + (fps % 10);
+            int nchars = 0;
+            fpsString[nchars++] = '0' + (fps / 10) % 10;
+            fpsString[nchars++] = '0' + (fps % 10);
+
+#if HSTX
+            // Append the HSTX auto-resync count so display glitches are visible.
+            fpsString[nchars++] = ' ';
+            fpsString[nchars++] = 'R';
+            int resync = get_video_output_resync_count();
+            char digits[10];
+            int nd = 0;
+            do
+            {
+                digits[nd++] = '0' + (resync % 10);
+                resync /= 10;
+            } while (resync > 0 && nd < (int)sizeof(digits));
+            while (nd > 0 && nchars < (int)sizeof(fpsString))
+            {
+                fpsString[nchars++] = digits[--nd];
+            }
+#endif
+            fpsStringLen = nchars;
         }
     }
 }
